@@ -61,7 +61,7 @@ Contributor
 <td align="center">
 <a href="https://github.com/AreImanth" target="_blank">
 <img src="https://github.com/AreImanth.png" width="100px;" alt="Collaborator"/><br>
-<strong>Collaborator Name</strong>
+<strong>Are Imanth</strong>
 </a>
 <br>
 Contributor
