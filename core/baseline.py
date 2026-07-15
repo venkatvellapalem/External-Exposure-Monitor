@@ -3,30 +3,37 @@ from pathlib import Path
 from core.models import ExposureEvent
 
 class BaselineEngine:
-    """Tracks known exposures using a simple JSON state file to detect only new ones."""
+    """Tracks stateful status (open/closed) of scanned exposures to detect changes over time."""
+    
     def __init__(self, baseline_file: str = "data/baseline.json"):
         self.baseline_file = Path(baseline_file)
         self.baseline_file.parent.mkdir(parents=True, exist_ok=True)
-        self.state = self._load()
+        self.state = self._load() # Map of "ip:port" -> "open"/"closed"
 
-    def _load(self) -> set:
-        """Loads known exposures as a set of 'ip:port' strings."""
+    def _load(self) -> dict:
+        """Loads baseline state as a dictionary of ip:port mapping to status."""
         if not self.baseline_file.exists():
-            return set()
-        with self.baseline_file.open("r", encoding="utf-8") as f:
-            return set(json.load(f))
+            return {}
+        try:
+            with self.baseline_file.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
 
     def _save(self) -> None:
-        """Saves current exposures to disk."""
+        """Saves current state to disk."""
         with self.baseline_file.open("w", encoding="utf-8") as f:
-            json.dump(list(self.state), f)
+            json.dump(self.state, f, indent=4)
 
-    def is_new_exposure(self, event: ExposureEvent) -> bool:
-        """Returns True if this exposure hasn't been seen before. Saves it if new."""
-        exposure_id = f"{event.ip}:{event.port}"
-        if exposure_id in self.state:
-            return False
-        
-        self.state.add(exposure_id)
+    def get_status(self, ip: str, port: int) -> str:
+        """Returns the last known status ('open' or 'closed') or None if never seen."""
+        return self.state.get(f"{ip}:{port}")
+
+    def update_status(self, ip: str, port: int, status: str) -> None:
+        """Updates the status of an exposure and saves to baseline file."""
+        self.state[f"{ip}:{port}"] = status
         self._save()
-        return True
+
+    def get_currently_open(self) -> set:
+        """Returns a set of 'ip:port' strings currently recorded as open."""
+        return {key for key, value in self.state.items() if value == "open"}

@@ -1,8 +1,4 @@
-organization: Blue Corp
+organization: College Network
 assets:
   - type: ip
-    value: 8.8.8.8
-  - type: ip
-    value: 1.1.1.1
-  - type: domain
-    value: dns.google
+    value: 117.250.201.144

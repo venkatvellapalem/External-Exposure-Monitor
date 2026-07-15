@@ -47,6 +47,7 @@ def main():
     env_path = Path(".env")
     current_url = ""
     current_token = ""
+    current_timeout = "2.5"
     
     if env_path.exists():
         with env_path.open("r") as f:
@@ -55,6 +56,8 @@ def main():
                     current_url = line.split("=", 1)[1].strip()
                 elif line.startswith("SPLUNK_HEC_TOKEN="):
                     current_token = line.split("=", 1)[1].strip()
+                elif line.startswith("SCAN_TIMEOUT="):
+                    current_timeout = line.split("=", 1)[1].strip()
 
     # Clean Prompts for HEC configuration
     use_existing_hec = "n"
@@ -77,6 +80,13 @@ def main():
         print("[!] Splunk URL and HEC Token are required to run the collector.")
         return
 
+    # Prompt for SCAN_TIMEOUT
+    timeout_str = input(f"Connection Scan Timeout (seconds) [{current_timeout}] -> ").strip() or current_timeout
+    try:
+        float(timeout_str)
+    except ValueError:
+        timeout_str = "2.5"
+
     # Test connection
     test_conn = input("Test HEC connection now? (y/n) -> ").strip().lower() or "y"
     if test_conn == "y":
@@ -86,7 +96,8 @@ def main():
     with env_path.open("w") as f:
         f.write(f"SPLUNK_URL={url}\n")
         f.write(f"SPLUNK_HEC_TOKEN={token}\n")
-    print("[-] Splunk config saved.")
+        f.write(f"SCAN_TIMEOUT={timeout_str}\n")
+    print("[-] Config parameters saved to .env")
 
     # 2. Configure Assets
     assets_path = Path("config/assets.yaml")
@@ -108,35 +119,32 @@ def main():
 
     if use_existing_assets != "y":
         org = input("\nOrganization Name -> ").strip() or "Blue Corp"
-        
-        # Explicit Public IP / CIDR question
-        public_target = input("Public IP or CIDR to scan -> ").strip()
-        while not public_target:
-            print("[!] You must specify at least one target IP or CIDR to scan.")
-            public_target = input("Public IP or CIDR to scan -> ").strip()
-            
         new_assets = []
-        # Simple type detection
-        t_type = "cidr" if "/" in public_target else "ip"
-        new_assets.append({"type": t_type, "value": public_target})
-        print(f"[-] Added public target ({t_type}): {public_target}")
-
-        # Ask for other targets
-        print("\nEnter additional targets (IPs, CIDRs, or Domains). Press Enter on an empty line to finish:")
+        
+        # Sequenced configuration loop
+        print("\n--- Configure Asset Inventory ---")
         while True:
-            target = input("Additional Target -> ").strip()
-            if not target:
-                break
+            print("\nSelect target type:")
+            print("  1: Single IP (e.g. 8.8.8.8)")
+            print("  2: CIDR Range (e.g. 192.168.1.0/24)")
+            print("  3: Domain Name (e.g. google.com)")
             
-            if "/" in target:
-                t_type = "cidr"
-            elif any(c.isalpha() for c in target) and "." in target:
-                t_type = "domain"
-            else:
-                t_type = "ip"
+            choice = input("Choice (1-3) -> ").strip()
+            if choice not in {"1", "2", "3"}:
+                print("[!] Invalid choice. Please enter 1, 2, or 3.")
+                continue
                 
-            new_assets.append({"type": t_type, "value": target})
-            print(f"[-] Added ({t_type}): {target}")
+            t_type = "ip" if choice == "1" else "cidr" if choice == "2" else "domain"
+            value = input(f"Enter {t_type} target value -> ").strip()
+            while not value:
+                value = input(f"Enter {t_type} target value -> ").strip()
+                
+            new_assets.append({"type": t_type, "value": value})
+            print(f"[-] Added {t_type}: {value}")
+            
+            another = input("Would you like to add another asset? (y/n) -> ").strip().lower()
+            if another != "y":
+                break
 
         config_data = {
             "organization": org,

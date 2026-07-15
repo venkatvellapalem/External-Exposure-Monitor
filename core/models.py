@@ -11,6 +11,8 @@ class ExposureEvent:
     vulns: List[str]
     tags: List[str]
     source: str = "internetdb"
+    domain: str = ""
+    status: str = "open" # "open" or "closed" to represent lifecycle changes
     
     def to_dict(self) -> dict:
         return asdict(self)
