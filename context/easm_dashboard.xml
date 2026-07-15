@@ -1,0 +1,86 @@
+<dashboard version="1.1" theme="dark">
+  <label>External Attack Surface Monitor (EASM)</label>
+  <description>OSINT Intelligence powered by Shodan InternetDB</description>
+  <row>
+    <panel>
+      <title>Total Exposed Services</title>
+      <single>
+        <search>
+          <query>index="*" source="internetdb" | stats count</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,10,50,100]</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">inverse</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Critical / High Exposures</title>
+      <single>
+        <search>
+          <query>index="*" source="internetdb" (risk="Critical" OR risk="High") | stats count</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,5]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Exposures by Risk</title>
+      <chart>
+        <search>
+          <query>index="*" source="internetdb" | stats count by risk</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.fieldColors">{"Critical": 0xdc4e41, "High": 0xf1813f, "Medium": 0xf8be34, "Low": 0x53a051}</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Top Exposed Ports</title>
+      <chart>
+        <search>
+          <query>index="*" source="internetdb" | top limit=10 port</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Newly Discovered Exposed Services (Last 24h)</title>
+      <table>
+        <search>
+          <query>index="*" source="internetdb" | table _time, ip, port, hostnames{}, risk, vulns{} | sort - _time</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <format type="color" field="risk">
+          <colorPalette type="map">{"Critical":#dc4e41,"High":#f1813f,"Medium":#f8be34,"Low":#53a051}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+</dashboard>

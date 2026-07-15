@@ -1,0 +1,191 @@
+{
+    "title": "EASM SOC Command Center",
+    "description": "Enterprise External Attack Surface Monitor (Dashboard Studio)",
+    "theme": "dark",
+    "visualizations": {
+        "viz_total_exposures": {
+            "type": "splunk.singlevalue",
+            "dataSources": {
+                "primary": "ds_total_exposures"
+            },
+            "title": "Active Exposures",
+            "options": {
+                "majorColor": "> majorColorEditorConfig"
+            },
+            "context": {
+                "majorColorEditorConfig": [
+                    {"value": "#53a051", "match": [0, 10]},
+                    {"value": "#f8be34", "match": [10, 50]},
+                    {"value": "#dc4e41", "match": [50, 1000]}
+                ]
+            }
+        },
+        "viz_critical_exposures": {
+            "type": "splunk.singlevalue",
+            "dataSources": {
+                "primary": "ds_critical_exposures"
+            },
+            "title": "Critical / High Threat Alerts",
+            "options": {
+                "majorColor": "#dc4e41"
+            }
+        },
+        "viz_ingest_rate": {
+            "type": "splunk.line",
+            "dataSources": {
+                "primary": "ds_ingest_rate"
+            },
+            "title": "Ingestion Scan Rate over Time"
+        },
+        "viz_risk_breakdown": {
+            "type": "splunk.pie",
+            "dataSources": {
+                "primary": "ds_risk_breakdown"
+            },
+            "title": "Attack Surface Risk Severity",
+            "options": {
+                "seriesColors": ["#53a051", "#f8be34", "#f1813f", "#dc4e41"]
+            }
+        },
+        "viz_top_ports": {
+            "type": "splunk.bar",
+            "dataSources": {
+                "primary": "ds_top_ports"
+            },
+            "title": "Exposed Ports Distribution"
+        },
+        "viz_map": {
+            "type": "splunk.map",
+            "dataSources": {
+                "primary": "ds_map"
+            },
+            "title": "Geographical Exposure Map",
+            "options": {
+                "center": [20, 0],
+                "zoom": 1
+            }
+        },
+        "viz_recent_exposures": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_recent_exposures"
+            },
+            "title": "Live EASM Alert Feed (Real-Time Splunk Ingestion)"
+        }
+    },
+    "dataSources": {
+        "ds_total_exposures": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=* source=easm_collector | stats count"
+            }
+        },
+        "ds_critical_exposures": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=* source=easm_collector (risk=\"Critical\" OR risk=\"High\") | stats count"
+            }
+        },
+        "ds_ingest_rate": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=* source=easm_collector | timechart span=1h count by risk"
+            }
+        },
+        "ds_risk_breakdown": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=* source=easm_collector | stats count by risk"
+            }
+        },
+        "ds_top_ports": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=* source=easm_collector | top limit=10 port"
+            }
+        },
+        "ds_map": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=* source=easm_collector | iplocation ip | geostats count"
+            }
+        },
+        "ds_recent_exposures": {
+            "type": "ds.search",
+            "options": {
+                "query": "index=* source=easm_collector | table _time, ip, port, \"hostnames{}\", risk | sort - _time"
+            }
+        }
+    },
+    "defaults": {
+        "dataSources": {
+            "ds.search": {
+                "options": {
+                    "queryParameters": {
+                        "latest": "$global_time.latest$",
+                        "earliest": "$global_time.earliest$"
+                    }
+                }
+            }
+        }
+    },
+    "inputs": {
+        "input_global_trp": {
+            "type": "input.timerange",
+            "options": {
+                "token": "global_time",
+                "defaultValue": "-24h@h,now"
+            },
+            "title": "Global Time Range"
+        }
+    },
+    "layout": {
+        "type": "absolute",
+        "options": {
+            "display": "auto-scale",
+            "backgroundColor": "#0c0f12",
+            "width": 1600,
+            "height": 1100
+        },
+        "structure": [
+            {
+                "item": "viz_total_exposures",
+                "type": "block",
+                "position": {"x": 20, "y": 80, "w": 300, "h": 180}
+            },
+            {
+                "item": "viz_critical_exposures",
+                "type": "block",
+                "position": {"x": 340, "y": 80, "w": 300, "h": 180}
+            },
+            {
+                "item": "viz_ingest_rate",
+                "type": "block",
+                "position": {"x": 660, "y": 80, "w": 920, "h": 180}
+            },
+            {
+                "item": "viz_risk_breakdown",
+                "type": "block",
+                "position": {"x": 20, "y": 280, "w": 500, "h": 380}
+            },
+            {
+                "item": "viz_top_ports",
+                "type": "block",
+                "position": {"x": 540, "y": 280, "w": 520, "h": 380}
+            },
+            {
+                "item": "viz_map",
+                "type": "block",
+                "position": {"x": 1080, "y": 280, "w": 500, "h": 380}
+            },
+            {
+                "item": "viz_recent_exposures",
+                "type": "block",
+                "position": {"x": 20, "y": 680, "w": 1560, "h": 400}
+            }
+        ],
+        "globalInputs": [
+            "input_global_trp"
+        ]
+    }
+}
