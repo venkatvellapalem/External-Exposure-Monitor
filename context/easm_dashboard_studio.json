@@ -77,13 +77,13 @@
         "ds_total_exposures": {
             "type": "ds.search",
             "options": {
-                "query": "index=* source=easm_collector | stats count"
+                "query": "index=* source=easm_collector | dedup ip port | stats count"
             }
         },
         "ds_critical_exposures": {
             "type": "ds.search",
             "options": {
-                "query": "index=* source=easm_collector (risk=\"Critical\" OR risk=\"High\") | stats count"
+                "query": "index=* source=easm_collector (risk=\"Critical\" OR risk=\"High\") | dedup ip port | stats count"
             }
         },
         "ds_ingest_rate": {
@@ -95,13 +95,13 @@
         "ds_risk_breakdown": {
             "type": "ds.search",
             "options": {
-                "query": "index=* source=easm_collector | stats count by risk"
+                "query": "index=* source=easm_collector | dedup ip port | stats count by risk"
             }
         },
         "ds_top_ports": {
             "type": "ds.search",
             "options": {
-                "query": "index=* source=easm_collector | top limit=10 port"
+                "query": "index=* source=easm_collector | dedup ip port | top limit=10 port"
             }
         },
         "ds_map": {
@@ -113,7 +113,7 @@
         "ds_recent_exposures": {
             "type": "ds.search",
             "options": {
-                "query": "index=* source=easm_collector | table _time, ip, port, \"hostnames{}\", risk | sort - _time"
+                "query": "index=* source=easm_collector | dedup ip port | table _time, ip, port, \"hostnames{}\", risk | sort - _time"
             }
         }
     },
