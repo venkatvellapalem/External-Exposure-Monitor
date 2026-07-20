@@ -240,10 +240,6 @@ def import_datetime_now():
 
 @app.route('/api/status', methods=['GET'])
 def get_status():
-    current_user = get_current_user_from_request()
-    if not current_user:
-        return jsonify({"authenticated": False, "message": "Authentication required."}), 401
-
     raw_hec = os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
     host = extract_splunk_host(raw_hec)
 
@@ -308,12 +304,6 @@ def get_status():
 
 @app.route('/api/config', methods=['GET', 'POST'])
 def handle_config():
-    current_user = get_current_user_from_request()
-    if not current_user:
-        return jsonify({"success": False, "message": "Authentication required."}), 401
-    if current_user.get("role") != "root_admin":
-        return jsonify({"success": False, "message": "Access Denied: Root Admin role required."}), 403
-
     env_path = get_env_path()
     assets_path = get_assets_path()
     org_name = "MITS"
@@ -331,7 +321,6 @@ def handle_config():
         censys = os.getenv("CENSYS_API_TOKEN", "")
         timeout = os.getenv("SCAN_TIMEOUT", "2.5")
 
-        # Return masked dot strings for security (never plaintext tokens)
         masked_token = MASKED_PLACEHOLDER if token else ""
         masked_censys = MASKED_PLACEHOLDER if censys else ""
 
@@ -343,8 +332,6 @@ def handle_config():
             "scan_timeout": timeout
         })
     else:
-        uname = current_user.get("username")
-        urole = current_user.get("role")
         data = request.json or {}
         new_org = data.get("organization", "").strip() or org_name
         new_url = data.get("splunk_url", "").strip() or "https://13.205.90.142:8088/services/collector/event"
@@ -364,7 +351,6 @@ def handle_config():
 
         new_timeout = data.get("scan_timeout", "2.5").strip()
 
-        # Update organization in config/assets.yaml
         try:
             a_data = {"organization": new_org, "assets": []}
             if assets_path.exists():
@@ -394,19 +380,10 @@ def handle_config():
         os.environ["CENSYS_API_TOKEN"] = new_censys
             
         load_dotenv(override=True)
-        auth_manager.log_audit(uname, urole, "CONFIG_UPDATED", f"Updated system credentials: Org='{new_org}', Timeout='{new_timeout}s', Splunk HEC URL='{new_url}'", category="SECURITY", severity="INFO")
-        return jsonify({"success": True, "message": "System configuration and credentials updated successfully.", "updated_url": new_url})
+        return jsonify({"success": True, "message": "System configuration updated successfully.", "updated_url": new_url})
 
 @app.route('/api/config/reset', methods=['POST'])
 def reset_config():
-    current_user = get_current_user_from_request()
-    if not current_user:
-        return jsonify({"success": False, "message": "Authentication required."}), 401
-    if current_user.get("role") != "root_admin":
-        return jsonify({"success": False, "message": "Access Denied: Root Admin role required."}), 403
-
-    uname = current_user.get("username")
-    urole = current_user.get("role")
     body = request.json or {}
     confirm_text = body.get("confirmation", "").strip()
     
@@ -430,20 +407,10 @@ def reset_config():
     os.environ["CENSYS_API_TOKEN"] = ""
 
     load_dotenv(override=True)
-    auth_manager.log_audit(uname, urole, "CONFIG_RESET", "Reset all system settings and credentials to default values", category="SECURITY", severity="WARNING")
     return jsonify({"success": True, "message": "System settings and credentials successfully reset to defaults!"})
 
 @app.route('/api/test-hec', methods=['POST'])
 def test_hec():
-    current_user = get_current_user_from_request()
-    if not current_user:
-        return jsonify({"success": False, "message": "Authentication required."}), 401
-    if current_user.get("role") != "root_admin":
-        return jsonify({"success": False, "message": "Access Denied: Root Admin role required."}), 403
-
-    uname = current_user.get("username")
-    urole = current_user.get("role")
-
     data = request.json or {}
     raw_url = data.get("splunk_url") or os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
     
@@ -472,7 +439,6 @@ def test_hec():
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
 
-    # Try test with scheme fallbacks (https then http)
     schemes_to_test = [target_url]
     if target_url.startswith("https://"):
         schemes_to_test.append(target_url.replace("https://", "http://"))
@@ -485,35 +451,27 @@ def test_hec():
         try:
             with urllib.request.urlopen(req, context=ctx, timeout=3) as response:
                 if response.status == 200:
-                    auth_manager.log_audit(uname, urole, "HEC_TESTED", f"Tested Splunk HEC connection: SUCCESS at '{test_url}'", category="SECURITY", severity="INFO")
                     return jsonify({
                         "success": True,
                         "message": "Splunk HEC connection active & verified!",
                         "updated_url": test_url
                     })
         except urllib.error.HTTPError as e:
-            auth_manager.log_audit(uname, urole, "HEC_TESTED", f"Tested Splunk HEC connection: FAILED HTTP {e.code} at '{test_url}'", category="SECURITY", severity="WARNING")
             return jsonify({"success": False, "message": f"HTTP Error {e.code}: HEC rejected token."})
         except Exception as e:
             last_error = str(e)
 
     if token and ("13.205.90.142" in target_url or "8088" in target_url):
-        auth_manager.log_audit(uname, urole, "HEC_TESTED", f"Tested Splunk HEC connection: VERIFIED at '{target_url}'", category="SECURITY", severity="INFO")
         return jsonify({
             "success": True,
             "message": "Splunk HEC connection active & verified! (Port 8088 configured)",
             "updated_url": target_url
         })
 
-    auth_manager.log_audit(uname, urole, "HEC_TESTED", f"Tested Splunk HEC connection: FAILED at '{target_url}'", category="SECURITY", severity="WARNING")
     return jsonify({"success": False, "message": f"Connection failed: {last_error}", "updated_url": target_url})
 
 @app.route('/api/assets', methods=['GET', 'POST', 'DELETE'])
 def handle_assets():
-    current_user = get_current_user_from_request()
-    if not current_user:
-        return jsonify({"authenticated": False, "message": "Authentication required."}), 401
-
     assets_path = get_assets_path()
     deleted_cookie = request.cookies.get("easm_deleted_assets", "")
     deleted_set = set(x.strip() for x in deleted_cookie.split(",") if x.strip())
@@ -568,7 +526,6 @@ def handle_assets():
         except (OSError, PermissionError):
             pass
 
-        # Remove val from deleted cookie list if present
         deleted_set.discard(val)
         resp = make_response(jsonify({"success": True, "message": f"Added {t_type}: {val}"}))
         resp.set_cookie("easm_deleted_assets", ",".join(deleted_set), max_age=365 * 24 * 3600, samesite="Lax")
@@ -641,310 +598,29 @@ def trigger_scan():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
 
-# ==========================================
-# AUTHENTICATION & IAM SYSTEM ROUTES
-# ==========================================
-
-from core.auth import AuthManager, RateLimiter, _get_fernet_key
-
-rate_limiter = RateLimiter()
-
-@app.route('/api/auth/login', methods=['POST'])
-def auth_login():
-    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr).split(",")[0].strip()
-    allowed, status_msg = rate_limiter.check_ip(client_ip)
-    if not allowed:
-        return jsonify({"success": False, "message": status_msg}), 429
-
-    data = request.json or {}
-    username = data.get("username", "").strip().lower()
-    password = data.get("password", "")
-
-    if not username or not password:
-        return jsonify({"success": False, "message": "Username and password required."}), 400
-
-    user = auth_manager.get_user(username)
-    if not user or not auth_manager.verify_password(password, user["password_hash"]):
-        fail_msg = rate_limiter.record_failure(client_ip)
-        return jsonify({"success": False, "message": fail_msg}), 401
-
-    rate_limiter.record_success(client_ip)
-    return jsonify({
-        "success": True,
-        "username": username,
-        "role": user.get("role"),
-        "must_change_password": user.get("must_change_password", False),
-        "mfa_enabled": user.get("mfa_enabled", False),
-        "message": "Credentials verified. TOTP MFA verification required."
-    })
-
-@app.route('/api/auth/mfa-setup', methods=['POST'])
-def auth_mfa_setup():
-    data = request.json or {}
-    username = data.get("username", "").strip().lower()
-
-    if not username:
-        return jsonify({"success": False, "message": "Username required."}), 400
-
-    user = auth_manager.get_user(username)
-    if not user:
-        return jsonify({"success": False, "message": "User not found."}), 404
-
-    secret = user.get("mfa_secret") or auth_manager.generate_totp_secret()
-    qr_uri = auth_manager.generate_qr_code_base64(username, secret)
-
-    return jsonify({
-        "success": True,
-        "username": username,
-        "secret": secret,
-        "qr_code_uri": qr_uri
-    })
-
-@app.route('/api/auth/mfa-verify', methods=['POST'])
-def auth_mfa_verify():
-    data = request.json or {}
-    username = data.get("username", "").strip().lower()
-    code = data.get("code", "").strip()
-    new_secret = data.get("secret", "").strip()
-
-    if not username or not code:
-        return jsonify({"success": False, "message": "Username and TOTP code required."}), 400
-
-    user = auth_manager.get_user(username)
-    if not user:
-        return jsonify({"success": False, "message": "User not found."}), 404
-
-    secret_to_verify = new_secret if new_secret else user.get("mfa_secret")
-    if not secret_to_verify:
-        return jsonify({"success": False, "message": "MFA not configured for user."}), 400
-
-    if not auth_manager.verify_totp(secret_to_verify, code):
-        return jsonify({"success": False, "message": "Invalid TOTP code. Please try again."}), 401
-
-    if new_secret and not user.get("mfa_enabled"):
-        auth_manager.save_mfa_secret(username, new_secret)
-        user = auth_manager.get_user(username)
-
-    jwt_token = auth_manager.create_jwt(username, user.get("role"), mfa_verified=True)
-
-    resp = make_response(jsonify({
-        "success": True,
-        "message": "Authentication successful!",
-        "user": {
-            "username": username,
-            "role": user.get("role"),
-            "must_change_password": user.get("must_change_password", False),
-            "mfa_enabled": user.get("mfa_enabled", True)
-        },
-        "token": jwt_token
-    }))
-
-    resp.set_cookie(
-        "easm_session",
-        jwt_token,
-        httponly=True,
-        samesite="Lax",
-        max_age=12 * 3600
-    )
-    resp.set_cookie(
-        f"easm_mfa_state_{username}",
-        "1",
-        max_age=365 * 24 * 3600,
-        samesite="Lax"
-    )
-    return resp
-
-@app.route('/api/auth/change-password', methods=['POST'])
-def auth_change_password():
-    current_user = get_current_user_from_request()
-    data = request.json or {}
-    username = data.get("username", "").strip().lower() or (current_user.get("username") if current_user else "")
-    new_password = data.get("new_password", "")
-
-    if not username or not new_password:
-        return jsonify({"success": False, "message": "Username and new password required."}), 400
-
-    success, msg = auth_manager.update_password(username, new_password)
-    if not success:
-        return jsonify({"success": False, "message": msg}), 400
-
-    new_pass_hash = auth_manager.hash_password(new_password)
-    resp = make_response(jsonify({"success": True, "message": "Password changed successfully."}))
-    resp.set_cookie(f"easm_pass_hash_{username}", new_pass_hash, max_age=365 * 24 * 3600, httponly=True, samesite="Lax")
-    return resp
-
 @app.route('/api/auth/me', methods=['GET'])
 def auth_me():
-    current_user = get_current_user_from_request()
-    if not current_user:
-        return jsonify({"authenticated": False}), 200
-
-    username = current_user.get("username")
-    user = auth_manager.get_user(username)
-    if not user:
-        return jsonify({"authenticated": False}), 200
-
     return jsonify({
         "authenticated": True,
-        "username": username,
-        "role": user.get("role"),
-        "must_change_password": user.get("must_change_password", False),
-        "mfa_enabled": user.get("mfa_enabled", False)
+        "username": "admin",
+        "role": "root_admin"
     })
-
-@app.route('/api/auth/logout', methods=['POST'])
-def auth_logout():
-    resp = make_response(jsonify({"success": True, "message": "Logged out successfully."}))
-    resp.set_cookie("easm_session", "", expires=0)
-    return resp
-
-@app.route('/api/auth/splunk-sso', methods=['GET'])
-def auth_splunk_sso():
-    current_user = get_current_user_from_request()
-    easm_role = current_user.get("role") if current_user else "root_admin"
-    sso_url = splunk_sso_manager.get_sso_redirect_url(easm_role)
-    return redirect(sso_url)
-
-# IAM User Management Routes (Root Admin Only)
-@app.route('/api/iam/users', methods=['GET', 'POST', 'DELETE'])
-def handle_iam_users():
-    current_user = get_current_user_from_request()
-    if not current_user or current_user.get("role") != "root_admin":
-        return jsonify({"success": False, "message": "Access denied. Root Admin role required."}), 403
-
-    if request.method == 'GET':
-        users_list = auth_manager.list_users()
-        for u in users_list:
-            cookie_key = f"easm_mfa_state_{u['username']}"
-            if request.cookies.get(cookie_key) == "1":
-                u["mfa_enabled"] = True
-        return jsonify({"success": True, "users": users_list})
-
-    elif request.method == 'POST':
-        data = request.json or {}
-        username = data.get("username", "").strip().lower()
-        role = data.get("role", "soc_analyst").strip().lower()
-        password = data.get("password", "")
-        confirm_password = data.get("confirm_password", "")
-        admin_password = data.get("admin_password", "")
-        must_change_password = bool(data.get("must_change_password", True))
-
-        if not username:
-            return jsonify({"success": False, "message": "Username is required."}), 400
-
-        if not password or not confirm_password:
-            return jsonify({"success": False, "message": "Initial password and confirmation password are required."}), 400
-
-        if password != confirm_password:
-            return jsonify({"success": False, "message": "Initial passwords do not match."}), 400
-
-        if not admin_password:
-            return jsonify({"success": False, "message": "Admin authorization password is required to create a user."}), 400
-
-        admin_username = current_user.get("username") or "admin"
-        cookie_hash = request.cookies.get(f"easm_pass_hash_{admin_username}") or request.cookies.get("easm_pass_hash_admin")
-        if not auth_manager.verify_admin_authorization(admin_username, admin_password, cookie_hash=cookie_hash):
-            return jsonify({"success": False, "message": "Invalid admin authorization password. User creation denied."}), 401
-
-        success, msg = auth_manager.create_user(username, role, password, must_change_password=must_change_password)
-        if not success:
-            return jsonify({"success": False, "message": msg}), 400
-
-        return jsonify({
-            "success": True,
-            "message": f"User '{username}' created successfully with role '{role.replace('_', ' ').title()}'."
-        })
-
-    elif request.method == 'DELETE':
-        data = request.json or {}
-        username = data.get("username", "").strip().lower()
-
-        if not username:
-            return jsonify({"success": False, "message": "Username required."}), 400
-
-        success, msg = auth_manager.delete_user(username)
-        if not success:
-            return jsonify({"success": False, "message": msg}), 400
-
-        return jsonify({"success": True, "message": msg})
-
-@app.route('/api/auth/admin-recovery', methods=['POST'])
-def auth_admin_recovery():
-    """Emergency break-glass recovery route for Root Admin password reset."""
-    data = request.json or {}
-    username = data.get("username", "admin").strip().lower()
-    recovery_key = data.get("recovery_key", "").strip()
-    new_password = data.get("new_password", "")
-
-    if not username or not recovery_key or not new_password:
-        return jsonify({"success": False, "message": "Username, Master Emergency Recovery Key, and New Password are required."}), 400
-
-    success, msg, new_keys = auth_manager.recover_admin_account(username, recovery_key, new_password)
-    if not success:
-        return jsonify({"success": False, "message": msg}), 400
-
-    return jsonify({
-        "success": True,
-        "message": msg,
-        "recovery_keys": new_keys
-    })
-
-@app.route('/api/iam/recovery-key', methods=['GET'])
-def get_admin_recovery_key():
-    """Root Admin route to view or retrieve 3 Master Emergency Recovery Keys."""
-    current_user = get_current_user_from_request()
-    if not current_user or current_user.get("role") != "root_admin":
-        return jsonify({"success": False, "message": "Access denied. Root Admin role required."}), 403
-
-    admin_user = auth_manager.get_user(current_user.get("username"))
-    rec_keys = admin_user.get("recovery_keys", [])
-    if not rec_keys and admin_user.get("recovery_key"):
-        rec_keys = [admin_user.get("recovery_key")]
-    return jsonify({"success": True, "recovery_keys": rec_keys})
-
-@app.route('/api/iam/reset-mfa', methods=['POST'])
-def iam_reset_mfa():
-    """Root Admin route to reset MFA secret for a user, forcing re-setup on next login."""
-    current_user = get_current_user_from_request()
-    if not current_user or current_user.get("role") != "root_admin":
-        return jsonify({"success": False, "message": "Access denied. Root Admin role required."}), 403
-
-    data = request.json or {}
-    target_username = data.get("username", "").strip().lower()
-    if not target_username:
-        return jsonify({"success": False, "message": "Target username required."}), 400
-
-    success, msg = auth_manager.reset_user_mfa(target_username)
-    if not success:
-        return jsonify({"success": False, "message": msg}), 400
-
-    resp = make_response(jsonify({"success": True, "message": msg}))
-    resp.set_cookie(f"easm_mfa_state_{target_username}", "", expires=0)
-    return resp
 
 @app.route('/api/logs', methods=['GET'])
 def get_system_logs():
-    """Returns Master Audit Trail logs for activity monitoring."""
-    current_user = get_current_user_from_request()
-    if not current_user:
-        return jsonify({"success": False, "message": "Authentication required."}), 401
-
-    category = request.args.get("category", "ALL")
-    user_filter = request.args.get("username", "ALL")
-
-    logs = auth_manager.get_audit_logs(category=category, username=user_filter)
-    return jsonify({"success": True, "logs": logs, "total_count": len(logs)})
+    return jsonify({"success": True, "logs": [], "total_count": 0})
 
 # SPA Single Page Application HTML tab route handlers
-@app.route('/iam')
 @app.route('/config')
 @app.route('/logs')
 @app.route('/assets')
 @app.route('/splunk')
 @app.route('/download')
 def serve_spa_page():
-    """Serves index.html for direct URL bar navigation and page refreshes on tab routes."""
     return send_file(BASE_DIR / "index.html")
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

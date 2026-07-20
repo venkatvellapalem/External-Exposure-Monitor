@@ -7,14 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initResetModal();
     initConfigResetModal();
     initLiveIngestionCanvas();
-    initAuthFlow();
     initPasswordToggles();
     initHamburgerDrawer();
-    initProfileDropdown();
-    initInactivityTracker();
-    initIamPasswordMatchListener();
 
-    checkAuthSession();
     loadStatus();
     loadConfig();
     loadAssets();
@@ -22,9 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-run-scan')?.addEventListener('click', runScan);
     document.getElementById('form-add-asset')?.addEventListener('submit', addAsset);
     document.getElementById('form-config')?.addEventListener('submit', saveConfig);
-    document.getElementById('form-create-user')?.addEventListener('submit', createIamUser);
     document.getElementById('btn-test-hec')?.addEventListener('click', testHec);
-    document.getElementById('btn-user-logout')?.addEventListener('click', () => handleLogout());
     document.getElementById('btn-refresh-logs')?.addEventListener('click', loadAuditLogs);
     document.getElementById('logs-category-filter')?.addEventListener('change', loadAuditLogs);
     document.getElementById('logs-user-filter')?.addEventListener('change', loadAuditLogs);
@@ -35,14 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('popstate', handlePopState);
 });
 
-let currentUser = null;
-let pendingAuthUser = null;
-let pendingMfaSecret = null;
-let activeRecoveryKeys = [];
-
-let lastUserActivity = Date.now();
-let sessionStartTime = Date.now();
-
 const TAB_SLUG_MAP = {
     'tab-dashboard': 'dashboard',
     'tab-scanner': 'scanner',
@@ -51,7 +36,6 @@ const TAB_SLUG_MAP = {
     'tab-about': 'about',
     'tab-splunk': 'splunk',
     'tab-config': 'config',
-    'tab-iam': 'iam',
     'tab-logs': 'logs'
 };
 
@@ -63,38 +47,8 @@ const SLUG_TAB_MAP = {
     'about': 'tab-about',
     'splunk': 'tab-splunk',
     'config': 'tab-config',
-    'iam': 'tab-iam',
     'logs': 'tab-logs'
 };
-
-function initInactivityTracker() {
-    const resetTimer = () => {
-        lastUserActivity = Date.now();
-    };
-
-    window.addEventListener('mousemove', resetTimer, { passive: true });
-    window.addEventListener('keydown', resetTimer, { passive: true });
-    window.addEventListener('click', resetTimer, { passive: true });
-    window.addEventListener('scroll', resetTimer, { passive: true });
-    window.addEventListener('touchstart', resetTimer, { passive: true });
-
-    setInterval(() => {
-        if (!currentUser) return;
-
-        const now = Date.now();
-        // 30 Minutes Inactivity Logout (30 * 60 * 1000 = 1,800,000 ms)
-        if (now - lastUserActivity > 30 * 60 * 1000) {
-            handleLogout("Logged out due to 30 minutes of inactivity.");
-            return;
-        }
-
-        // 1 Hour Absolute Session Lifetime Limit (60 * 60 * 1000 = 3,600,000 ms)
-        if (now - sessionStartTime > 60 * 60 * 1000) {
-            handleLogout("Maximum 1 hour session lifetime reached. Please sign in again.");
-            return;
-        }
-    }, 10000);
-}
 
 function initNavigation() {
     const navLinks = document.querySelectorAll('.nav-link');
@@ -117,17 +71,6 @@ function initNavigation() {
 }
 
 function switchTab(tabId, updateUrl = true) {
-    const targetSlug = TAB_SLUG_MAP[tabId] || 'dashboard';
-
-    // Strict RBAC Enforcement: Non-root_admin users CANNOT access IAM or Config
-    if ((tabId === 'tab-iam' || tabId === 'tab-config' || targetSlug === 'iam' || targetSlug === 'config') && currentUser?.role !== 'root_admin') {
-        showToast("Access Denied: Root Admin authorization required.", "error");
-        if (window.location.pathname !== '/dashboard') {
-            window.history.replaceState(null, '', '/dashboard');
-        }
-        tabId = 'tab-dashboard';
-    }
-
     document.querySelectorAll('.nav-link').forEach(link => {
         link.classList.toggle('active', link.getAttribute('data-tab') === tabId);
     });
@@ -138,10 +81,7 @@ function switchTab(tabId, updateUrl = true) {
         section.classList.toggle('active', section.id === tabId);
     });
 
-    if (tabId === 'tab-iam') {
-        loadIamUsers();
-        loadAdminRecoveryKey();
-    } else if (tabId === 'tab-logs') {
+    if (tabId === 'tab-logs') {
         loadAuditLogs();
     }
 
@@ -154,17 +94,7 @@ function switchTab(tabId, updateUrl = true) {
 }
 
 function handlePopState(e) {
-    if (!currentUser) return;
     const path = window.location.pathname.replace('/', '').toLowerCase();
-
-    // Strict RBAC Enforcement on URL navigation
-    if ((path === 'iam' || path === 'config') && currentUser.role !== 'root_admin') {
-        showToast("Access Denied: Root Admin authorization required.", "error");
-        window.history.replaceState(null, '', '/dashboard');
-        switchTab('tab-dashboard', false);
-        return;
-    }
-
     if (SLUG_TAB_MAP[path]) {
         switchTab(SLUG_TAB_MAP[path], false);
     } else {
