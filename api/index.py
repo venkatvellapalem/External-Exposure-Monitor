@@ -23,7 +23,7 @@ else:
 handler = app
 application = app
 
-# ponytail: simple serverless entrypoint for Vercel and local dev. Standard Flask API without ORM or unneeded middleware.
+# ponytail: simple serverless API entrypoint for Vercel and local dev. Handles /api/* endpoints only.
 
 def get_env_path():
     return BASE_DIR / ".env"
@@ -33,30 +33,6 @@ def get_assets_path():
 
 def get_baseline_path():
     return BASE_DIR / "data" / "baseline.json"
-
-@app.route('/')
-def serve_index():
-    if static_dir.exists() and (static_dir / 'index.html').exists():
-        return send_from_directory(str(static_dir), 'index.html')
-    return jsonify({"status": "EASM API Engine Online", "endpoints": ["/api/status", "/api/config", "/api/assets"]})
-
-@app.route('/dashboard')
-@app.route('/download')
-@app.route('/about')
-@app.route('/scanner')
-@app.route('/assets')
-@app.route('/splunk')
-@app.route('/config')
-def serve_routes():
-    if static_dir.exists() and (static_dir / 'index.html').exists():
-        return send_from_directory(str(static_dir), 'index.html')
-    return jsonify({"status": "EASM API Engine Online"})
-
-@app.route('/<path:path>')
-def serve_static(path):
-    if (Path(app.static_folder) / path).exists():
-        return send_from_directory(app.static_folder, path)
-    return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/api/status', methods=['GET'])
 def get_status():
