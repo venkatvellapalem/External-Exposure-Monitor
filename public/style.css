@@ -1630,3 +1630,18 @@ body {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* Generic Hidden utility & Input Error text */
+.hidden {
+    display: none !important;
+}
+
+.input-error-text.red {
+    color: #ef4444 !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    margin-top: 4px !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+}

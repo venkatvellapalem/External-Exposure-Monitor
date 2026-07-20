@@ -190,7 +190,7 @@ class AuthManager:
         except Exception as e:
             logger.error(f"[!] Failed to save users JSON: {e}")
 
-        # Save AES-256 encrypted vault file to primary and repo data/ directories
+        # Save AES-256 encrypted vault file across primary, repository, and /tmp directories
         try:
             fernet = Fernet(_get_fernet_key())
             json_bytes = json.dumps(data).encode('utf-8')
@@ -198,7 +198,8 @@ class AuthManager:
 
             vault_locations = [
                 self.users_file.parent / "users.vault",
-                BASE_DIR / "data" / "users.vault"
+                BASE_DIR / "data" / "users.vault",
+                Path("/tmp/data/users.vault")
             ]
             for vf in vault_locations:
                 try:
@@ -206,10 +207,6 @@ class AuthManager:
                     vf.write_bytes(encrypted)
                 except Exception:
                     pass
-        except Exception as e:
-            logger.error(f"[!] Failed to save encrypted users.vault: {e}")
-            encrypted_bytes = fernet.encrypt(json_bytes)
-            vault_file.write_bytes(encrypted_bytes)
         except Exception as e:
             logger.error(f"[!] Failed to save AES-256 encrypted vault: {e}")
 
@@ -459,25 +456,34 @@ class AuthManager:
         return result
 
     def verify_admin_authorization(self, admin_username: str, admin_password: str) -> bool:
-        """Verifies admin password against current stored hash, default admin passwords, or emergency keys."""
+        """Verifies admin authorization password against current logged-in admin, root_admin users, recovery keys, and defaults."""
         if not admin_password:
             return False
 
-        admin_user = self.get_user(admin_username)
-        if not admin_user:
-            return False
+        users = self._load_users()
 
-        stored_hash = admin_user.get("password_hash", "")
-        if stored_hash and self.verify_password(admin_password, stored_hash):
-            return True
-
-        for default_p in ["Admin@2026Secure!", "Splunk@2026Secure!", os.getenv("SPLUNK_ADMIN_PASS", "")]:
-            if default_p and admin_password == default_p:
+        # 1. Check specified admin_username or 'admin'
+        target_username = admin_username if admin_username and admin_username in users else "admin"
+        target_user = users.get(target_username)
+        if target_user:
+            stored_hash = target_user.get("password_hash", "")
+            if stored_hash and self.verify_password(admin_password, stored_hash):
                 return True
 
-        rec_hashes = admin_user.get("recovery_key_hashes", [])
-        for h in rec_hashes:
-            if self.verify_password(admin_password, h):
+        # 2. Check ALL root_admin accounts in database against updated password hashes and recovery keys
+        for u_name, u_data in users.items():
+            if u_data.get("role") == "root_admin":
+                sh = u_data.get("password_hash", "")
+                if sh and self.verify_password(admin_password, sh):
+                    return True
+                rec_hashes = u_data.get("recovery_key_hashes", [])
+                for h in rec_hashes:
+                    if self.verify_password(admin_password, h):
+                        return True
+
+        # 3. Fallback to default initial admin passwords
+        for default_p in ["Admin@2026Secure!", "Splunk@2026Secure!", os.getenv("SPLUNK_ADMIN_PASS", "")]:
+            if default_p and admin_password == default_p:
                 return True
 
         return False
