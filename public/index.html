@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EASM - External Exposure Monitor</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Ollama-style Header Navigation -->
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="m9 12 2 2 4-4"/>
+                </svg>
+                <span class="brand-title">EASM Engine</span>
+                <span class="brand-badge">v2.4</span>
+            </div>
+            <nav class="nav-menu">
+                <button class="nav-link active" data-tab="tab-overview">Overview</button>
+                <button class="nav-link" data-tab="tab-scanner">Scan Controller</button>
+                <button class="nav-link" data-tab="tab-assets">Asset Inventory</button>
+                <button class="nav-link" data-tab="tab-config">Settings</button>
+                <button class="nav-link" data-tab="tab-splunk">Splunk SOC Hub</button>
+            </nav>
+            <div class="nav-actions">
+                <a href="https://github.com/venkatvellapalem/External-Exposure-Monitor" target="_blank" class="nav-btn-icon" title="View Source on GitHub">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-layout">
+        <!-- Toast Notification Container -->
+        <div id="toast-container" class="toast-container"></div>
+
+        <!-- TAB 1: OVERVIEW & ONE-CLICK INSTALL -->
+        <section id="tab-overview" class="tab-content active">
+            <div class="hero-header">
+                <h1 class="hero-title">Download EASM Collector</h1>
+                <p class="hero-subtitle">Decoupled, zero-agent threat surface monitoring and real-time Splunk SIEM orchestration.</p>
+            </div>
+
+            <!-- One-Click Installation Snippet Box (Ollama & RobustOTP Style) -->
+            <div class="card install-card">
+                <div class="card-header">
+                    <h2 class="card-title">One-Click Installation</h2>
+                    <p class="card-desc">Download and run EASM Collector on your environment with a single command.</p>
+                </div>
+                
+                <div class="install-platform-tabs">
+                    <button class="platform-tab active" data-platform="win">Windows</button>
+                    <button class="platform-tab" data-platform="mac">macOS</button>
+                    <button class="platform-tab" data-platform="nix">Linux</button>
+                </div>
+
+                <div class="code-box">
+                    <code id="install-command">irm https://raw.githubusercontent.com/venkatvellapalem/External-Exposure-Monitor/main/install.ps1 | iex</code>
+                    <button class="copy-btn" id="btn-copy-install" title="Copy command">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="install-footnote" id="install-footnote">Copy and run this command in PowerShell</div>
+            </div>
+
+            <!-- Architecture & Metrics Grid -->
+            <div class="grid-2">
+                <div class="card info-card">
+                    <h3 class="info-card-title">Decoupled Attack Surface Architecture</h3>
+                    <p class="info-card-desc">EASM operates as an isolated threat monitoring authority:</p>
+                    
+                    <ul class="feature-list">
+                        <li>
+                            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                            <div><strong>Zero Target Traffic Bloat:</strong> Queries passive intelligence caches (Censys v3 & Shodan) without firing aggressive probes.</div>
+                        </li>
+                        <li>
+                            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                            <div><strong>Surgical Verification:</strong> Lightweight 2.5-second Python TCP handshakes confirm real-time open ports.</div>
+                        </li>
+                        <li>
+                            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                            <div><strong>Stateful Reconciliation:</strong> Tracks exposures and marks ports as closed automatically as risks are remediated.</div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="card metrics-card">
+                    <h3 class="info-card-title">Attack Surface Posture</h3>
+                    
+                    <div class="metrics-grid">
+                        <div class="metric-box">
+                            <span class="metric-value" id="stat-total-open">0</span>
+                            <span class="metric-label">Active Exposures</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-value" id="stat-monitored-targets">0</span>
+                            <span class="metric-label">Monitored Targets</span>
+                        </div>
+                    </div>
+
+                    <div class="status-indicator-box">
+                        <div class="status-dot green"></div>
+                        <span id="stat-engine-status">Collector Status: Ready</span>
+                    </div>
+
+                    <div class="action-footer">
+                        <button class="pill-btn primary" onclick="switchTab('tab-scanner')">Launch Scanner Center</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: SCAN CONTROLLER -->
+        <section id="tab-scanner" class="tab-content">
+            <div class="section-header">
+                <h2>Scan Controller & Execution Engine</h2>
+                <p>Trigger an on-demand external attack surface scan across all registered assets.</p>
+            </div>
+
+            <div class="card">
+                <div class="scanner-actions">
+                    <button class="pill-btn primary" id="btn-run-scan">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        Run EASM Scan Now
+                    </button>
+                    <span class="scan-status-text" id="scan-status-indicator">Ready to scan</span>
+                </div>
+
+                <div class="terminal-box">
+                    <div class="terminal-bar">
+                        <span class="terminal-title">Execution Output Log</span>
+                        <button class="terminal-clear" id="btn-clear-log">Clear</button>
+                    </div>
+                    <pre class="terminal-content" id="scan-log-output">=== EASM Collector Console Output ===
+Waiting for scan trigger...</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: ASSET INVENTORY -->
+        <section id="tab-assets" class="tab-content">
+            <div class="section-header">
+                <h2>Asset Inventory Management</h2>
+                <p>Manage monitored IP addresses, CIDR ranges, and Domain targets.</p>
+            </div>
+
+            <div class="card">
+                <form id="form-add-asset" class="asset-form">
+                    <div class="form-group">
+                        <label>Target Type</label>
+                        <select id="asset-type" class="form-input">
+                            <option value="ip">Single IP (e.g. 8.8.8.8)</option>
+                            <option value="cidr">CIDR Range (e.g. 192.168.1.0/24)</option>
+                            <option value="domain">Domain Name (e.g. google.com)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Target Value</label>
+                        <input type="text" id="asset-value" class="form-input" placeholder="117.250.201.144" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Associated Domain (Optional)</label>
+                        <input type="text" id="asset-domain" class="form-input" placeholder="My College Website">
+                    </div>
+                    <div class="form-group form-submit">
+                        <button type="submit" class="pill-btn primary">Add Asset Target</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3 class="card-subtitle">Configured Targets</h3>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Target Value</th>
+                                <th>Associated Domain</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assets-table-body">
+                            <tr>
+                                <td colspan="4" class="text-muted">Loading inventory...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: SETTINGS & CONFIGURATION -->
+        <section id="tab-config" class="tab-content">
+            <div class="section-header">
+                <h2>System Settings & Credentials</h2>
+                <p>Configure Splunk HEC integration, Censys API token, and connection timeouts.</p>
+            </div>
+
+            <div class="card">
+                <form id="form-config" class="config-form">
+                    <div class="form-row">
+                        <div class="form-group full">
+                            <label>Splunk HEC URL</label>
+                            <input type="url" id="cfg-splunk-url" class="form-input" placeholder="https://13.205.90.142:8088/services/collector/event" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Splunk HEC Token</label>
+                            <input type="password" id="cfg-splunk-token" class="form-input" placeholder="••••••••••••••••••••••••">
+                        </div>
+                        <div class="form-group half">
+                            <label>Censys Personal Access Token (PAT)</label>
+                            <input type="password" id="cfg-censys-token" class="form-input" placeholder="censys_••••••••••••••••">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Scan Connection Timeout (Seconds)</label>
+                            <input type="number" step="0.5" id="cfg-scan-timeout" class="form-input" value="2.5" required>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="pill-btn secondary" id="btn-test-hec">Test Splunk HEC Connection</button>
+                        <button type="submit" class="pill-btn primary">Save Configuration</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- TAB 5: SPLUNK SOC HUB -->
+        <section id="tab-splunk" class="tab-content">
+            <div class="section-header">
+                <h2>Splunk SOC Command Center Integration</h2>
+                <p>Direct access to pre-built Dashboard Studio code and investigation search shortcuts.</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="info-card-title">Launch Splunk SOC Center</h3>
+                    <p class="info-card-desc">Open your Splunk Enterprise instance to view the real-time Dashboard Studio Command Center.</p>
+                    <div class="action-footer">
+                        <a href="#" id="link-open-splunk" target="_blank" class="pill-btn primary">Open Splunk Web UI</a>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3 class="info-card-title">Dashboard Studio JSON</h3>
+                    <p class="info-card-desc">Download or copy the latest Dashboard Studio code with custom series color mappings.</p>
+                    <div class="action-footer">
+                        <a href="/context/easm_dashboard_studio.json" target="_blank" class="pill-btn secondary">View Dashboard JSON</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <span>External Exposure Monitor (EASM) — Powered by Python & Splunk</span>
+            <a href="https://github.com/venkatvellapalem/External-Exposure-Monitor" target="_blank" class="footer-link">GitHub Repository</a>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
