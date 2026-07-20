@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    handlePopState();
     initNavigation();
     initCopyButtons();
     initPlatformTabs();

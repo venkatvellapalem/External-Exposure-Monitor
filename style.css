@@ -1057,18 +1057,20 @@ body {
 
 .user-actions-dropdown {
     position: absolute;
-    right: 0;
-    top: 100%;
-    margin-top: 4px;
+    right: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
     background: #18181b;
     border: 1px solid #3f3f46;
-    border-radius: 8px;
-    padding: 6px;
+    border-radius: 6px;
+    padding: 4px;
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 150px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    width: max-content;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
     z-index: 9999;
 }
 
@@ -1077,31 +1079,35 @@ body {
 }
 
 .user-actions-dropdown button {
-    background: transparent;
-    border: none;
+    background: #27272a;
+    border: 1px solid #3f3f46;
     color: #f4f4f5;
-    padding: 8px 10px;
-    font-size: 12px;
+    padding: 5px 10px;
+    font-size: 11px;
     font-weight: 500;
     border-radius: 4px;
     cursor: pointer;
-    text-align: left;
-    display: flex;
+    white-space: nowrap;
+    display: inline-flex;
     align-items: center;
-    width: 100%;
-    transition: background 0.15s ease;
+    gap: 4px;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .user-actions-dropdown button:hover {
-    background: #27272a;
+    background: #3f3f46;
+    border-color: #52525b;
 }
 
 .user-actions-dropdown button.danger-item {
-    color: #ef4444;
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.3);
 }
 
 .user-actions-dropdown button.danger-item:hover {
-    background: rgba(239, 68, 68, 0.15);
+    background: rgba(239, 68, 68, 0.25);
+    border-color: #ef4444;
 }
 
 .password-input-wrapper {

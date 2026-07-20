@@ -923,5 +923,16 @@ def get_system_logs():
     logs = auth_manager.get_audit_logs(category=category, username=user_filter)
     return jsonify({"success": True, "logs": logs, "total_count": len(logs)})
 
+# SPA Single Page Application HTML tab route handlers
+@app.route('/iam')
+@app.route('/config')
+@app.route('/logs')
+@app.route('/assets')
+@app.route('/splunk')
+@app.route('/download')
+def serve_spa_page():
+    """Serves index.html for direct URL bar navigation and page refreshes on tab routes."""
+    return send_file(BASE_DIR / "index.html")
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
