@@ -492,6 +492,16 @@ def handle_assets():
     assets_path = get_assets_path()
     deleted_cookie = request.cookies.get("easm_deleted_assets", "")
     deleted_set = set(x.strip() for x in deleted_cookie.split(",") if x.strip())
+
+    custom_cookie = request.cookies.get("easm_custom_assets", "")
+    custom_list = []
+    if custom_cookie:
+        try:
+            custom_list = json.loads(urllib.parse.unquote(custom_cookie))
+            if not isinstance(custom_list, list):
+                custom_list = []
+        except Exception:
+            custom_list = []
     
     if request.method == 'GET':
         raw_assets = []
@@ -504,8 +514,17 @@ def handle_assets():
                     raw_assets = data.get("assets", []) or []
             except Exception:
                 pass
+
+        # Merge raw file assets with custom cookie assets (deduplicated by value)
+        combined_map = {}
+        for a in raw_assets:
+            if a.get("value"):
+                combined_map[a.get("value")] = a
+        for a in custom_list:
+            if a.get("value"):
+                combined_map[a.get("value")] = a
         
-        filtered_assets = [a for a in raw_assets if a.get("value") not in deleted_set]
+        filtered_assets = [a for val, a in combined_map.items() if val not in deleted_set]
         return jsonify({
             "organization": org_name,
             "assets": filtered_assets
@@ -531,6 +550,11 @@ def handle_assets():
         if "assets" not in data or data["assets"] is None:
             data["assets"] = []
 
+        new_asset = {"type": t_type, "value": val}
+        if domain:
+            new_asset["domain"] = domain
+
+        # Update in file data structure
         existing_assets = data["assets"]
         found = False
         for a in existing_assets:
@@ -540,18 +564,27 @@ def handle_assets():
                     a["domain"] = domain
                 found = True
                 break
-
         if not found:
-            new_asset = {"type": t_type, "value": val}
-            if domain:
-                new_asset["domain"] = domain
             existing_assets.append(new_asset)
 
         data["assets"] = existing_assets
         save_assets_to_yaml(data)
 
+        # Update in custom cookie list
+        c_found = False
+        for a in custom_list:
+            if a.get("value") == val:
+                a["type"] = t_type
+                if domain:
+                    a["domain"] = domain
+                c_found = True
+                break
+        if not c_found:
+            custom_list.append(new_asset)
+
         deleted_set.discard(val)
         resp = make_response(jsonify({"success": True, "message": f"Added target {t_type}: {val}"}))
+        resp.set_cookie("easm_custom_assets", urllib.parse.quote(json.dumps(custom_list)), max_age=365 * 24 * 3600, samesite="Lax")
         resp.set_cookie("easm_deleted_assets", ",".join(deleted_set), max_age=365 * 24 * 3600, samesite="Lax")
         return resp
 
@@ -574,8 +607,11 @@ def handle_assets():
         data["assets"] = [a for a in raw_assets if a.get("value") != val_to_delete]
         save_assets_to_yaml(data)
 
+        custom_list = [a for a in custom_list if a.get("value") != val_to_delete]
         deleted_set.add(val_to_delete)
+
         resp = make_response(jsonify({"success": True, "message": f"Removed asset target: {val_to_delete}"}))
+        resp.set_cookie("easm_custom_assets", urllib.parse.quote(json.dumps(custom_list)), max_age=365 * 24 * 3600, samesite="Lax")
         resp.set_cookie("easm_deleted_assets", ",".join(deleted_set), max_age=365 * 24 * 3600, samesite="Lax")
         return resp
 
@@ -598,14 +634,49 @@ def reset_assets():
         pass
 
     resp = make_response(jsonify({"success": True, "message": "Asset inventory and baseline metrics successfully reset!"}))
+    resp.set_cookie("easm_custom_assets", "", expires=0)
     resp.set_cookie("easm_deleted_assets", "", expires=0)
     return resp
 
 @app.route('/api/scan', methods=['POST'])
 def trigger_scan():
     try:
+        assets_path = get_assets_path()
+        deleted_cookie = request.cookies.get("easm_deleted_assets", "")
+        deleted_set = set(x.strip() for x in deleted_cookie.split(",") if x.strip())
+
+        custom_cookie = request.cookies.get("easm_custom_assets", "")
+        custom_list = []
+        if custom_cookie:
+            try:
+                custom_list = json.loads(urllib.parse.unquote(custom_cookie))
+            except Exception:
+                custom_list = []
+
+        raw_assets = []
+        if assets_path.exists():
+            try:
+                with assets_path.open("r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+                    raw_assets = data.get("assets", []) or []
+            except Exception:
+                pass
+
+        combined_map = {}
+        for a in raw_assets:
+            if a.get("value"):
+                combined_map[a.get("value")] = a
+        for a in custom_list:
+            if a.get("value"):
+                combined_map[a.get("value")] = a
+        
+        active_assets = [a for val, a in combined_map.items() if val not in deleted_set]
+
         cmd = ["python", str(BASE_DIR / "collector.py")]
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        env = os.environ.copy()
+        env["EASM_CUSTOM_TARGETS"] = json.dumps(active_assets)
+
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
         out, err = process.communicate(timeout=45)
         return jsonify({
             "success": True,

@@ -45,13 +45,31 @@ def resolve_reverse_dns(ip: str) -> list:
 
 def get_target_ips():
     """Yields unique individual tuples of (ip, domain/hostname) from the configured assets."""
+    import json
     config = ConfigLoader().load()
+    assets = list(config.get("assets", []) or [])
+
+    custom_targets_env = os.getenv("EASM_CUSTOM_TARGETS", "")
+    if custom_targets_env:
+        try:
+            custom_list = json.loads(custom_targets_env)
+            if isinstance(custom_list, list):
+                existing_vals = {a.get("value") for a in assets if a.get("value")}
+                for item in custom_list:
+                    if item.get("value") and item.get("value") not in existing_vals:
+                        assets.append(item)
+                        existing_vals.add(item.get("value"))
+        except Exception as e:
+            logger.error(f"[!] Error parsing EASM_CUSTOM_TARGETS: {e}")
+
     crt = CrtClient()
     scanned_ips = set()
-    
-    for asset in config.get("assets", []):
+
+    for asset in assets:
         val = asset.get("value")
-        a_type = asset.get("type")
+        a_type = asset.get("type", "ip")
+        if not val:
+            continue
         
         if a_type == "cidr":
             for ip in ipaddress.ip_network(val, strict=False):
@@ -60,13 +78,11 @@ def get_target_ips():
                     scanned_ips.add(ip_str)
                     yield ip_str, ""
         elif a_type == "domain":
-            # 1. Always resolve and scan the root domain itself first
             root_ip = resolve_to_ip(val)
             if root_ip and root_ip not in scanned_ips:
                 scanned_ips.add(root_ip)
                 yield root_ip, val
 
-            # 2. Additionally check subdomains in CT logs
             subs = crt.get_subdomains(val)
             for sub in subs:
                 sub_ip = resolve_to_ip(sub)
