@@ -11,9 +11,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = Flask(__name__, static_folder="../public", static_url_path="")
-
 BASE_DIR = Path(__file__).resolve().parent.parent
+static_dir = BASE_DIR / "public"
+
+if static_dir.exists():
+    app = Flask(__name__, static_folder=str(static_dir), static_url_path="")
+else:
+    app = Flask(__name__)
+
+# WSGI Handlers for Vercel Serverless Functions
+handler = app
+application = app
 
 # ponytail: simple serverless entrypoint for Vercel and local dev. Standard Flask API without ORM or unneeded middleware.
 
