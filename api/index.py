@@ -147,6 +147,16 @@ def serve_js():
         return send_file(str(js_file), mimetype='application/javascript')
     return "", 404
 
+@app.route('/context/easm_dashboard_studio.json')
+@app.route('/easm_dashboard_studio.json')
+def serve_dashboard_json():
+    json_file = BASE_DIR / "easm_dashboard_studio.json"
+    if not json_file.exists():
+        json_file = BASE_DIR / "public" / "easm_dashboard_studio.json"
+    if json_file.exists():
+        return send_file(str(json_file), mimetype='application/json')
+    return "", 404
+
 @app.route('/api/status', methods=['GET'])
 def get_status():
     raw_hec = os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")

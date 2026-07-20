@@ -70,6 +70,31 @@
                 <div class="metric-box">
                     <span class="metric-value" id="dash-monitored-targets">1</span>
                     <span class="metric-label">Monitored Targets</span>
+            </div>
+
+            <!-- Live Ingestion Throughput Card -->
+            <div class="card margin-bottom">
+                <div class="card-header-flex">
+                    <div>
+                        <h3 class="info-card-title">Live Ingestion Rate & Scanning Throughput</h3>
+                        <p class="info-card-desc">Real-time scan event stream to Splunk HTTP Event Collector (Port 8088).</p>
+                    </div>
+                    <div class="pulse-badge">
+                        <span class="pulse-dot"></span>
+                        <span>0.8 events/sec</span>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <svg class="sparkline-chart" viewBox="0 0 500 80" preserveAspectRatio="none">
+                        <defs>
+                            <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#000000" stop-opacity="0.15"/>
+                                <stop offset="100%" stop-color="#000000" stop-opacity="0.0"/>
+                            </linearGradient>
+                        </defs>
+                        <path d="M0,80 L0,55 Q125,15 250,45 T500,25 L500,80 Z" fill="url(#spark-grad)"/>
+                        <path d="M0,55 Q125,15 250,45 T500,25" fill="none" stroke="#000000" stroke-width="2.5"/>
+                    </svg>
                 </div>
             </div>
 

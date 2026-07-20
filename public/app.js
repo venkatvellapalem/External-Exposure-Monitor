@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initCopyButtons();
     initPlatformTabs();
+    initAssetTypeListener();
     loadStatus();
     loadConfig();
     loadAssets();
@@ -13,39 +14,94 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-clear-log')?.addEventListener('click', () => {
         document.getElementById('scan-log-output').textContent = '=== EASM Collector Console Output ===\nWaiting for scan trigger...';
     });
+
+    window.addEventListener('popstate', handlePopState);
 });
+
+const TAB_SLUG_MAP = {
+    'tab-dashboard': 'dashboard',
+    'tab-scanner': 'scanner',
+    'tab-assets': 'assets',
+    'tab-download': 'download',
+    'tab-about': 'about',
+    'tab-splunk': 'splunk',
+    'tab-config': 'config'
+};
+
+const SLUG_TAB_MAP = {
+    'dashboard': 'tab-dashboard',
+    'scanner': 'tab-scanner',
+    'assets': 'tab-assets',
+    'download': 'tab-download',
+    'about': 'tab-about',
+    'splunk': 'tab-splunk',
+    'config': 'tab-config'
+};
 
 function initNavigation() {
     const navLinks = document.querySelectorAll('.nav-link');
     navLinks.forEach(link => {
         link.addEventListener('click', () => {
             const targetTab = link.getAttribute('data-tab');
-            switchTab(targetTab);
+            switchTab(targetTab, true);
         });
     });
 
-    // Check pathname for direct links
-    const path = window.location.pathname.replace('/', '');
-    const tabMap = {
-        'dashboard': 'tab-dashboard',
-        'scanner': 'tab-scanner',
-        'assets': 'tab-assets',
-        'download': 'tab-download',
-        'about': 'tab-about',
-        'splunk': 'tab-splunk',
-        'config': 'tab-config'
-    };
-    if (tabMap[path]) {
-        switchTab(tabMap[path]);
+    const path = window.location.pathname.replace('/', '').toLowerCase();
+    if (path === '' || path === 'index.html') {
+        history.replaceState({ tab: 'tab-dashboard' }, '', '/dashboard');
+        switchTab('tab-dashboard', false);
+    } else if (SLUG_TAB_MAP[path]) {
+        switchTab(SLUG_TAB_MAP[path], false);
+    } else {
+        switchTab('tab-dashboard', false);
     }
 }
 
-function switchTab(tabId) {
+function switchTab(tabId, updateUrl = true) {
     document.querySelectorAll('.nav-link').forEach(link => {
         link.classList.toggle('active', link.getAttribute('data-tab') === tabId);
     });
     document.querySelectorAll('.tab-content').forEach(section => {
         section.classList.toggle('active', section.id === tabId);
+    });
+
+    if (updateUrl && TAB_SLUG_MAP[tabId]) {
+        const slug = '/' + TAB_SLUG_MAP[tabId];
+        if (window.location.pathname !== slug) {
+            history.pushState({ tab: tabId }, '', slug);
+        }
+    }
+}
+
+function handlePopState(e) {
+    const path = window.location.pathname.replace('/', '').toLowerCase();
+    if (SLUG_TAB_MAP[path]) {
+        switchTab(SLUG_TAB_MAP[path], false);
+    } else {
+        switchTab('tab-dashboard', false);
+    }
+}
+
+function initAssetTypeListener() {
+    const typeSelect = document.getElementById('asset-type');
+    const valueInput = document.getElementById('asset-value');
+    const domainInput = document.getElementById('asset-domain');
+
+    if (!typeSelect || !valueInput || !domainInput) return;
+
+    const placeholders = {
+        ip: { value: "203.0.113.195", domain: "example.com" },
+        cidr: { value: "192.168.1.0/24", domain: "internal-network.local" },
+        domain: { value: "subdomain.example.com", domain: "example.com" }
+    };
+
+    typeSelect.addEventListener('change', () => {
+        const selected = typeSelect.value;
+        if (placeholders[selected]) {
+            valueInput.placeholder = placeholders[selected].value;
+            domainInput.placeholder = placeholders[selected].domain;
+        }
     });
 }
 
