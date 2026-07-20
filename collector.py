@@ -168,6 +168,7 @@ def main():
                 baseline.update_status(event.ip, event.port, "open")
                 
                 event_dict = event.to_dict()
+                event_dict["organization"] = config.get("organization", "MITS")
                 risk = calculate_risk(event)
                 
                 web_ports = {80, 443, 8080, 8443, 2082, 2083, 2087, 8880}

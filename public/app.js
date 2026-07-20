@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initPlatformTabs();
     initAssetTypeListener();
     initResetModal();
+    initConfigResetModal();
     initLiveIngestionCanvas();
     loadStatus();
     loadConfig();
@@ -172,6 +173,65 @@ function initResetModal() {
     });
 }
 
+function initConfigResetModal() {
+    const btnOpen = document.getElementById('btn-reset-config');
+    const modal = document.getElementById('config-reset-modal');
+    const btnCancel = document.getElementById('btn-cancel-config-reset');
+    const btnConfirm = document.getElementById('btn-confirm-config-reset');
+    const input = document.getElementById('config-reset-confirm-input');
+
+    if (!btnOpen || !modal || !btnCancel || !btnConfirm || !input) return;
+
+    btnOpen.addEventListener('click', () => {
+        input.value = '';
+        modal.classList.remove('hidden');
+        input.focus();
+    });
+
+    btnCancel.addEventListener('click', () => {
+        modal.classList.add('hidden');
+        input.value = '';
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+            input.value = '';
+        }
+    });
+
+    btnConfirm.addEventListener('click', async () => {
+        const val = input.value.trim();
+        if (val !== "reset my settings") {
+            showToast("Confirmation mismatch. Reset aborted.");
+            return;
+        }
+
+        btnConfirm.disabled = true;
+        try {
+            const res = await fetch('/api/config/reset', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ confirmation: val })
+            });
+            const data = await res.json();
+            if (data.success) {
+                modal.classList.add('hidden');
+                input.value = '';
+                showToast("System settings and credentials successfully reset!");
+                loadConfig();
+                loadStatus();
+            } else {
+                showToast("Reset failed: " + data.message);
+            }
+        } catch (err) {
+            showToast("Error resetting settings.");
+        } finally {
+            btnConfirm.disabled = false;
+        }
+    });
+}
+
 function initLiveIngestionCanvas() {
     const canvas = document.getElementById('ingestion-canvas');
     if (!canvas) return;
@@ -293,22 +353,25 @@ async function loadStatus() {
         if (document.getElementById('dash-org-name')) document.getElementById('dash-org-name').textContent = `Organization: ${data.organization || 'MITS'}`;
         if (document.getElementById('ingest-rate-live')) document.getElementById('ingest-rate-live').textContent = data.ingestion_rate || '0.0 events/sec';
 
-        // Update 1-2 Word Minimal Health Badges
+        // Update Minimal Active/Inactive Health Badges
         const badgeHec = document.getElementById('badge-hec');
         const badgeCensys = document.getElementById('badge-censys');
-        const badgeReconcile = document.getElementById('badge-reconcile');
+        const badgeShodan = document.getElementById('badge-shodan');
 
         if (badgeHec) {
-            badgeHec.textContent = data.hec_badge || 'Connected';
-            badgeHec.className = `badge-status ${data.hec_badge === 'Disconnected' ? 'red' : 'green'}`;
+            const statusStr = data.hec_badge || 'Active';
+            badgeHec.textContent = statusStr;
+            badgeHec.className = `badge-status ${statusStr === 'Inactive' ? 'red' : 'green'}`;
         }
         if (badgeCensys) {
-            badgeCensys.textContent = data.censys_badge || 'Active';
-            badgeCensys.className = `badge-status ${data.censys_badge === 'Inactive' ? 'red' : 'green'}`;
+            const statusStr = data.censys_badge || 'Active';
+            badgeCensys.textContent = statusStr;
+            badgeCensys.className = `badge-status ${statusStr === 'Inactive' ? 'red' : 'green'}`;
         }
-        if (badgeReconcile) {
-            badgeReconcile.textContent = data.reconcile_badge || 'Operational';
-            badgeReconcile.className = 'badge-status green';
+        if (badgeShodan) {
+            const statusStr = data.shodan_badge || 'Active';
+            badgeShodan.textContent = statusStr;
+            badgeShodan.className = `badge-status ${statusStr === 'Inactive' ? 'red' : 'green'}`;
         }
 
         // Direct Dashboard Studio Link
@@ -326,10 +389,11 @@ async function loadConfig() {
     try {
         const res = await fetch('/api/config');
         const data = await res.json();
-        if (data.splunk_url) document.getElementById('cfg-splunk-url').value = data.splunk_url;
-        if (data.splunk_token) document.getElementById('cfg-splunk-token').value = data.splunk_token;
-        if (data.censys_token) document.getElementById('cfg-censys-token').value = data.censys_token;
-        if (data.scan_timeout) document.getElementById('cfg-scan-timeout').value = data.scan_timeout;
+        if (data.organization && document.getElementById('cfg-org-name')) document.getElementById('cfg-org-name').value = data.organization;
+        if (data.splunk_url && document.getElementById('cfg-splunk-url')) document.getElementById('cfg-splunk-url').value = data.splunk_url;
+        if (data.splunk_token && document.getElementById('cfg-splunk-token')) document.getElementById('cfg-splunk-token').value = data.splunk_token;
+        if (data.censys_token && document.getElementById('cfg-censys-token')) document.getElementById('cfg-censys-token').value = data.censys_token;
+        if (data.scan_timeout && document.getElementById('cfg-scan-timeout')) document.getElementById('cfg-scan-timeout').value = data.scan_timeout;
     } catch (e) {
         console.error("Failed to load config:", e);
     }
@@ -337,6 +401,7 @@ async function loadConfig() {
 
 async function saveConfig(e) {
     e.preventDefault();
+    const org = document.getElementById('cfg-org-name').value;
     const url = document.getElementById('cfg-splunk-url').value;
     const token = document.getElementById('cfg-splunk-token').value;
     const censys = document.getElementById('cfg-censys-token').value;
@@ -347,6 +412,7 @@ async function saveConfig(e) {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
+                organization: org,
                 splunk_url: url,
                 splunk_token: token,
                 censys_token: censys,

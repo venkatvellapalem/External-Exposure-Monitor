@@ -15,13 +15,12 @@
     <header class="navbar">
         <div class="nav-container">
             <div class="nav-brand">
-                <svg class="brand-icon" viewBox="0 0 32 32" fill="none">
-                    <rect width="32" height="32" rx="8" fill="#090d16"/>
-                    <circle cx="16" cy="16" r="12" stroke="#10b981" stroke-width="1.8"/>
-                    <circle cx="16" cy="16" r="7" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="3 2"/>
-                    <circle cx="16" cy="16" r="3" fill="#10b981"/>
-                    <path d="M16 2V6M16 26V30M2 16H6M26 16H30" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round"/>
-                    <polygon points="16,9 18.5,16 16,14.5 13.5,16" fill="#6366f1"/>
+                <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9"/>
+                    <circle cx="12" cy="12" r="5" stroke-dasharray="2 2"/>
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                    <path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
+                    <path d="m12 12 4-4"/>
                 </svg>
                 <span class="brand-title">EASM Engine</span>
                 <span class="brand-badge">v2.4</span>
@@ -99,15 +98,15 @@
                     <ul class="health-list-badges">
                         <li class="health-badge-item">
                             <span>Splunk HEC Connection</span>
-                            <span class="badge-status green" id="badge-hec">Connected</span>
+                            <span class="badge-status green" id="badge-hec">Active</span>
                         </li>
                         <li class="health-badge-item">
-                            <span>Censys v3 Host API</span>
+                            <span>Censys v3 Feeds</span>
                             <span class="badge-status green" id="badge-censys">Active</span>
                         </li>
                         <li class="health-badge-item">
-                            <span>Active Reconciliation</span>
-                            <span class="badge-status green" id="badge-reconcile">Operational</span>
+                            <span>Shodan Feeds</span>
+                            <span class="badge-status green" id="badge-shodan">Active</span>
                         </li>
                     </ul>
                 </div>
@@ -327,6 +326,16 @@ Waiting for scan trigger...</pre>
             <div class="card">
                 <form id="form-config" class="config-form">
                     <div class="form-row">
+                        <div class="form-group half">
+                            <label>Organization Name</label>
+                            <input type="text" id="cfg-org-name" class="form-input" placeholder="MITS" required>
+                        </div>
+                        <div class="form-group half">
+                            <label>Scan Connection Timeout (Seconds)</label>
+                            <input type="number" step="0.5" id="cfg-scan-timeout" class="form-input" value="2.5" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
                         <div class="form-group full">
                             <label>Splunk HEC URL (Port 8088 Endpoint)</label>
                             <input type="url" id="cfg-splunk-url" class="form-input" placeholder="https://13.205.90.142:8088/services/collector/event" required>
@@ -342,18 +351,23 @@ Waiting for scan trigger...</pre>
                             <input type="password" id="cfg-censys-token" class="form-input" placeholder="••••••••••••••••">
                         </div>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group half">
-                            <label>Scan Connection Timeout (Seconds)</label>
-                            <input type="number" step="0.5" id="cfg-scan-timeout" class="form-input" value="2.5" required>
-                        </div>
-                    </div>
 
                     <div class="form-actions">
                         <button type="button" class="pill-btn secondary" id="btn-test-hec">Test HEC Connection</button>
                         <button type="submit" class="pill-btn primary">Save Configuration</button>
                     </div>
                 </form>
+            </div>
+
+            <!-- DANGER ZONE: Reset Settings & Credentials -->
+            <div class="card danger-card margin-bottom">
+                <div class="card-header-flex">
+                    <div>
+                        <h3 class="info-card-title danger-text">Danger Zone: Reset Settings & Credentials</h3>
+                        <p class="info-card-desc">Permanently reset Splunk URLs, HEC tokens, Censys API tokens, and scan timeouts to defaults.</p>
+                    </div>
+                    <button class="pill-btn danger" id="btn-reset-config">Reset Settings & Credentials</button>
+                </div>
             </div>
         </section>
 
@@ -390,11 +404,27 @@ Waiting for scan trigger...</pre>
                 <p class="modal-desc">Are you sure you want to permanently wipe all registered assets and reset exposure dashboard baseline metrics?</p>
                 <div class="form-group margin-bottom">
                     <label>To proceed, type exactly: <strong>delete my asset inventory</strong></label>
-                    <input type="text" id="reset-confirm-input" class="form-input" placeholder="delete my asset inventory" autocomplete="off">
+                    <input type="text" id="reset-confirm-input" class="form-input" placeholder="" autocomplete="off">
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="pill-btn secondary" id="btn-cancel-reset">Cancel</button>
                     <button type="button" class="pill-btn danger" id="btn-confirm-reset">Confirm & Reset Inventory</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- In-Page Red Confirmation Modal for Reset Settings & Credentials -->
+        <div id="config-reset-modal" class="modal-overlay hidden">
+            <div class="modal-card danger-modal">
+                <h3 class="modal-title danger-text">Reset System Settings & Credentials</h3>
+                <p class="modal-desc">Are you sure you want to reset all Splunk URLs, HEC tokens, Censys API tokens, and scan timeouts to defaults?</p>
+                <div class="form-group margin-bottom">
+                    <label>To proceed, type exactly: <strong>reset my settings</strong></label>
+                    <input type="text" id="config-reset-confirm-input" class="form-input" placeholder="" autocomplete="off">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="pill-btn secondary" id="btn-cancel-config-reset">Cancel</button>
+                    <button type="button" class="pill-btn danger" id="btn-confirm-config-reset">Confirm & Reset Settings</button>
                 </div>
             </div>
         </div>

@@ -237,9 +237,9 @@ def get_status():
         "medium_count": medium_count,
         "monitored_targets": asset_count,
         "ingestion_rate": f"{real_rate} events/sec",
-        "hec_badge": "Connected",
+        "hec_badge": "Active" if (os.getenv("SPLUNK_HEC_TOKEN") or os.getenv("SPLUNK_URL")) else "Inactive",
         "censys_badge": "Active" if os.getenv("CENSYS_API_TOKEN") else "Inactive",
-        "reconcile_badge": "Operational",
+        "shodan_badge": "Active",
         "splunk_hec_url": raw_hec,
         "splunk_web_url": splunk_web,
         "splunk_dashboard_url": splunk_dashboard,
@@ -250,6 +250,16 @@ def get_status():
 @app.route('/api/config', methods=['GET', 'POST'])
 def handle_config():
     env_path = get_env_path()
+    assets_path = get_assets_path()
+    org_name = "MITS"
+    if assets_path.exists():
+        try:
+            with assets_path.open("r", encoding="utf-8") as f:
+                a_data = yaml.safe_load(f) or {}
+                org_name = a_data.get("organization", "MITS")
+        except Exception:
+            pass
+
     if request.method == 'GET':
         url = os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
         token = os.getenv("SPLUNK_HEC_TOKEN", "")
@@ -261,6 +271,7 @@ def handle_config():
         masked_censys = MASKED_PLACEHOLDER if censys else ""
 
         return jsonify({
+            "organization": org_name,
             "splunk_url": url,
             "splunk_token": masked_token,
             "censys_token": masked_censys,
@@ -268,6 +279,7 @@ def handle_config():
         })
     else:
         data = request.json or {}
+        new_org = data.get("organization", "").strip() or org_name
         new_url = data.get("splunk_url", "").strip() or "https://13.205.90.142:8088/services/collector/event"
         new_url = normalize_splunk_url(new_url)
 
@@ -285,6 +297,19 @@ def handle_config():
 
         new_timeout = data.get("scan_timeout", "2.5").strip()
 
+        # Update organization in config/assets.yaml
+        try:
+            a_data = {"organization": new_org, "assets": []}
+            if assets_path.exists():
+                with assets_path.open("r", encoding="utf-8") as f:
+                    a_data = yaml.safe_load(f) or a_data
+            a_data["organization"] = new_org
+            writable_assets = get_writable_file("config/assets.yaml")
+            with writable_assets.open("w", encoding="utf-8") as f:
+                yaml.dump(a_data, f, default_flow_style=False)
+        except Exception:
+            pass
+
         try:
             with env_path.open("w", encoding="utf-8") as f:
                 f.write(f"SPLUNK_URL={new_url}\n")
@@ -296,6 +321,27 @@ def handle_config():
             
         load_dotenv(override=True)
         return jsonify({"success": True, "message": "Configuration updated successfully."})
+
+@app.route('/api/config/reset', methods=['POST'])
+def reset_config():
+    body = request.json or {}
+    confirm_text = body.get("confirmation", "").strip()
+    
+    if confirm_text != "reset my settings":
+        return jsonify({"success": False, "message": "Confirmation string mismatch. Reset aborted."})
+
+    env_path = get_env_path()
+    try:
+        with env_path.open("w", encoding="utf-8") as f:
+            f.write("SPLUNK_URL=https://13.205.90.142:8088/services/collector/event\n")
+            f.write("SPLUNK_HEC_TOKEN=\n")
+            f.write("SCAN_TIMEOUT=2.5\n")
+            f.write("CENSYS_API_TOKEN=\n")
+    except Exception:
+        pass
+
+    load_dotenv(override=True)
+    return jsonify({"success": True, "message": "System settings and credentials successfully reset to defaults!"})
 
 @app.route('/api/test-hec', methods=['POST'])
 def test_hec():
