@@ -455,14 +455,18 @@ class AuthManager:
             })
         return result
 
-    def verify_admin_authorization(self, admin_username: str, admin_password: str) -> bool:
-        """Verifies admin authorization password against current logged-in admin, root_admin users, recovery keys, and defaults."""
+    def verify_admin_authorization(self, admin_username: str, admin_password: str, cookie_hash: str = None) -> bool:
+        """Verifies admin authorization password against stored hash, cookie hash, root_admin users, recovery keys, and defaults."""
         if not admin_password:
             return False
 
+        # 1. Check cookie_hash from Vercel serverless session if password was changed in session
+        if cookie_hash and self.verify_password(admin_password, cookie_hash):
+            return True
+
         users = self._load_users()
 
-        # 1. Check specified admin_username or 'admin'
+        # 2. Check specified admin_username or 'admin'
         target_username = admin_username if admin_username and admin_username in users else "admin"
         target_user = users.get(target_username)
         if target_user:
@@ -470,7 +474,7 @@ class AuthManager:
             if stored_hash and self.verify_password(admin_password, stored_hash):
                 return True
 
-        # 2. Check ALL root_admin accounts in database against updated password hashes and recovery keys
+        # 3. Check ALL root_admin accounts in database against updated password hashes and recovery keys
         for u_name, u_data in users.items():
             if u_data.get("role") == "root_admin":
                 sh = u_data.get("password_hash", "")
@@ -481,7 +485,7 @@ class AuthManager:
                     if self.verify_password(admin_password, h):
                         return True
 
-        # 3. Fallback to default initial admin passwords
+        # 4. Fallback to default initial admin passwords
         for default_p in ["Admin@2026Secure!", "Splunk@2026Secure!", os.getenv("SPLUNK_ADMIN_PASS", "")]:
             if default_p and admin_password == default_p:
                 return True

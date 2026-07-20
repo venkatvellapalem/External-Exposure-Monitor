@@ -760,7 +760,10 @@ def auth_change_password():
     if not success:
         return jsonify({"success": False, "message": msg}), 400
 
-    return jsonify({"success": True, "message": "Password changed successfully."})
+    new_pass_hash = auth_manager.hash_password(new_password)
+    resp = make_response(jsonify({"success": True, "message": "Password changed successfully."}))
+    resp.set_cookie(f"easm_pass_hash_{username}", new_pass_hash, max_age=365 * 24 * 3600, httponly=True, samesite="Lax")
+    return resp
 
 @app.route('/api/auth/me', methods=['GET'])
 def auth_me():
@@ -830,8 +833,9 @@ def handle_iam_users():
         if not admin_password:
             return jsonify({"success": False, "message": "Admin authorization password is required to create a user."}), 400
 
-        admin_username = current_user.get("username")
-        if not auth_manager.verify_admin_authorization(admin_username, admin_password):
+        admin_username = current_user.get("username") or "admin"
+        cookie_hash = request.cookies.get(f"easm_pass_hash_{admin_username}") or request.cookies.get("easm_pass_hash_admin")
+        if not auth_manager.verify_admin_authorization(admin_username, admin_password, cookie_hash=cookie_hash):
             return jsonify({"success": False, "message": "Invalid admin authorization password. User creation denied."}), 401
 
         success, msg = auth_manager.create_user(username, role, password, must_change_password=must_change_password)
