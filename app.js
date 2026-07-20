@@ -383,6 +383,7 @@ function initAuthFlow() {
             });
             const data = await res.json();
             if (data.success) {
+                localStorage.setItem('easm_mfa_' + pendingEnableMfaUser, 'true');
                 document.getElementById('enable-mfa-modal')?.classList.add('hidden');
                 showToast(`TOTP MFA successfully enabled and enforced for '${pendingEnableMfaUser}'!`);
                 loadIamUsers();
@@ -695,6 +696,7 @@ async function probeResetUserMfa(username) {
         });
         const data = await res.json();
         if (data.success) {
+            localStorage.removeItem('easm_mfa_' + username);
             showToast(data.message);
             loadIamUsers();
             openMfaEnableModal(username);
@@ -734,6 +736,10 @@ async function loadIamUsers() {
         }
 
         data.users.forEach(u => {
+            if (localStorage.getItem('easm_mfa_' + u.username) === 'true') {
+                u.mfa_enabled = true;
+            }
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td><strong>${u.username}</strong></td>

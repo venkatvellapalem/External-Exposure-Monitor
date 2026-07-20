@@ -22,11 +22,11 @@
     },
     "tempuser1": {
         "username": "tempuser1",
-        "password_hash": "$2b$12$SKulu1l4EWTVnfHI3T3Yf.K01X5yOpDVgZaZjku8bt7Tk0mbW.RLi",
+        "password_hash": "$2b$12$WcbDJrbqgaJbyikF7C91ueIyJZWIh6/VLphtWKderCAQoRGwVcWwu",
         "role": "soc_analyst",
         "must_change_password": true,
         "mfa_enabled": false,
         "mfa_secret": "",
-        "created_at": "2026-07-20T17:05:35.623804+00:00"
+        "created_at": "2026-07-20T17:11:18.037697+00:00"
     }
 }

@@ -708,6 +708,12 @@ def auth_mfa_verify():
         samesite="Lax",
         max_age=12 * 3600
     )
+    resp.set_cookie(
+        f"easm_mfa_state_{username}",
+        "1",
+        max_age=365 * 24 * 3600,
+        samesite="Lax"
+    )
     return resp
 
 @app.route('/api/auth/change-password', methods=['POST'])
@@ -767,6 +773,10 @@ def handle_iam_users():
 
     if request.method == 'GET':
         users_list = auth_manager.list_users()
+        for u in users_list:
+            cookie_key = f"easm_mfa_state_{u['username']}"
+            if request.cookies.get(cookie_key) == "1":
+                u["mfa_enabled"] = True
         return jsonify({"success": True, "users": users_list})
 
     elif request.method == 'POST':
@@ -866,7 +876,9 @@ def iam_reset_mfa():
     if not success:
         return jsonify({"success": False, "message": msg}), 400
 
-    return jsonify({"success": True, "message": msg})
+    resp = make_response(jsonify({"success": True, "message": msg}))
+    resp.set_cookie(f"easm_mfa_state_{target_username}", "", expires=0)
+    return resp
 
 @app.route('/api/logs', methods=['GET'])
 def get_system_logs():
