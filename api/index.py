@@ -78,8 +78,13 @@ def extract_splunk_host(raw_url: str) -> str:
         host = clean_url.split("/", 1)[0].split(":", 1)[0]
     return host or "13.205.90.142"
 
-def query_splunk_rest_api(host: str, username: str = "admin", password: str = "Splunk@2026Secure!"):
+def query_splunk_rest_api(host: str):
     """Queries Splunk REST Management API (Port 8089) for real-time events."""
+    username = os.getenv("SPLUNK_ADMIN_USER", "admin")
+    password = os.getenv("SPLUNK_ADMIN_PASS", "")
+    if not username or not password:
+        return []
+
     creds = base64.b64encode(f"{username}:{password}".encode()).decode()
     headers = {
         "Authorization": f"Basic {creds}",
@@ -241,8 +246,8 @@ def handle_config():
     env_path = get_env_path()
     if request.method == 'GET':
         url = os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
-        token = os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
-        censys = os.getenv("CENSYS_API_TOKEN", "censys_EoyeoHTw_4Bqv968FBtRVrrQ9fZrJNisw")
+        token = os.getenv("SPLUNK_HEC_TOKEN", "")
+        censys = os.getenv("CENSYS_API_TOKEN", "")
         timeout = os.getenv("SCAN_TIMEOUT", "2.5")
 
         # Return masked dot strings for security (never plaintext tokens)
@@ -262,13 +267,13 @@ def handle_config():
 
         input_token = data.get("splunk_token", "").strip()
         if not input_token or "•" in input_token or "*" in input_token or input_token == MASKED_PLACEHOLDER:
-            new_token = os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
+            new_token = os.getenv("SPLUNK_HEC_TOKEN", "")
         else:
             new_token = input_token
 
         input_censys = data.get("censys_token", "").strip()
         if not input_censys or "•" in input_censys or "*" in input_censys or input_censys == MASKED_PLACEHOLDER:
-            new_censys = os.getenv("CENSYS_API_TOKEN", "censys_EoyeoHTw_4Bqv968FBtRVrrQ9fZrJNisw")
+            new_censys = os.getenv("CENSYS_API_TOKEN", "")
         else:
             new_censys = input_censys
 
@@ -293,7 +298,7 @@ def test_hec():
     
     input_token = data.get("splunk_token", "").strip()
     if not input_token or "•" in input_token or "*" in input_token or input_token == MASKED_PLACEHOLDER:
-        token = os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
+        token = os.getenv("SPLUNK_HEC_TOKEN", "")
     else:
         token = input_token
 

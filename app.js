@@ -96,13 +96,19 @@ function initAssetTypeListener() {
         domain: { value: "subdomain.example.com", domain: "example.com" }
     };
 
-    typeSelect.addEventListener('change', () => {
+    const updatePlaceholders = () => {
         const selected = typeSelect.value;
         if (placeholders[selected]) {
             valueInput.placeholder = placeholders[selected].value;
             domainInput.placeholder = placeholders[selected].domain;
+            valueInput.setAttribute('placeholder', placeholders[selected].value);
+            domainInput.setAttribute('placeholder', placeholders[selected].domain);
         }
-    });
+    };
+
+    typeSelect.addEventListener('change', updatePlaceholders);
+    typeSelect.addEventListener('input', updatePlaceholders);
+    updatePlaceholders();
 }
 
 function initPlatformTabs() {
