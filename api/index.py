@@ -36,7 +36,9 @@ def get_baseline_path():
 
 @app.route('/')
 def serve_index():
-    return send_from_directory(app.static_folder, 'index.html')
+    if static_dir.exists() and (static_dir / 'index.html').exists():
+        return send_from_directory(str(static_dir), 'index.html')
+    return jsonify({"status": "EASM API Engine Online", "endpoints": ["/api/status", "/api/config", "/api/assets"]})
 
 @app.route('/dashboard')
 @app.route('/download')
@@ -46,7 +48,9 @@ def serve_index():
 @app.route('/splunk')
 @app.route('/config')
 def serve_routes():
-    return send_from_directory(app.static_folder, 'index.html')
+    if static_dir.exists() and (static_dir / 'index.html').exists():
+        return send_from_directory(str(static_dir), 'index.html')
+    return jsonify({"status": "EASM API Engine Online"})
 
 @app.route('/<path:path>')
 def serve_static(path):
