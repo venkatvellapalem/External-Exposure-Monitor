@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initCopyButtons();
     initPlatformTabs();
     initAssetTypeListener();
+    initResetModal();
     initLiveIngestionCanvas();
     loadStatus();
     loadConfig();
@@ -10,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-run-scan')?.addEventListener('click', runScan);
     document.getElementById('form-add-asset')?.addEventListener('submit', addAsset);
-    document.getElementById('btn-reset-inventory')?.addEventListener('click', resetAssetInventory);
     document.getElementById('form-config')?.addEventListener('submit', saveConfig);
     document.getElementById('btn-test-hec')?.addEventListener('click', testHec);
     document.getElementById('btn-clear-log')?.addEventListener('click', () => {
@@ -113,12 +113,71 @@ function initAssetTypeListener() {
     updatePlaceholders();
 }
 
+function initResetModal() {
+    const btnOpen = document.getElementById('btn-reset-inventory');
+    const modal = document.getElementById('reset-modal');
+    const btnCancel = document.getElementById('btn-cancel-reset');
+    const btnConfirm = document.getElementById('btn-confirm-reset');
+    const input = document.getElementById('reset-confirm-input');
+
+    if (!btnOpen || !modal || !btnCancel || !btnConfirm || !input) return;
+
+    btnOpen.addEventListener('click', () => {
+        input.value = '';
+        modal.classList.remove('hidden');
+        input.focus();
+    });
+
+    btnCancel.addEventListener('click', () => {
+        modal.classList.add('hidden');
+        input.value = '';
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+            input.value = '';
+        }
+    });
+
+    btnConfirm.addEventListener('click', async () => {
+        const val = input.value.trim();
+        if (val !== "delete my asset inventory") {
+            showToast("Confirmation mismatch. Reset aborted.");
+            return;
+        }
+
+        btnConfirm.disabled = true;
+        try {
+            const res = await fetch('/api/assets/reset', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ confirmation: val })
+            });
+            const data = await res.json();
+            if (data.success) {
+                modal.classList.add('hidden');
+                input.value = '';
+                showToast("Asset inventory and dashboard exposure values successfully reset!");
+                loadAssets();
+                loadStatus();
+            } else {
+                showToast("Reset failed: " + data.message);
+            }
+        } catch (err) {
+            showToast("Error resetting inventory.");
+        } finally {
+            btnConfirm.disabled = false;
+        }
+    });
+}
+
 function initLiveIngestionCanvas() {
     const canvas = document.getElementById('ingestion-canvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    let points = [35, 42, 28, 55, 48, 62, 50, 58, 45, 65, 52, 60, 48, 55, 68];
+    let points = [15, 22, 18, 35, 28, 42, 30, 38, 25, 45, 32, 40, 28, 35, 48];
     const maxPoints = 20;
 
     function drawChart() {
@@ -139,7 +198,6 @@ function initLiveIngestionCanvas() {
             ctx.bezierCurveTo(cpX, prevY, cpX, y, x, y);
         }
 
-        // Gradient Fill under curve
         const gradient = ctx.createLinearGradient(0, 0, 0, h);
         gradient.addColorStop(0, 'rgba(0, 0, 0, 0.12)');
         gradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
@@ -150,7 +208,6 @@ function initLiveIngestionCanvas() {
         ctx.fillStyle = gradient;
         ctx.fill();
 
-        // Curve Line
         ctx.beginPath();
         ctx.moveTo(0, h - (points[0] / 100) * h);
         for (let i = 1; i < points.length; i++) {
@@ -168,22 +225,15 @@ function initLiveIngestionCanvas() {
 
     drawChart();
 
-    // Ticking Live Animation Loop (Every 1.5 Seconds)
     setInterval(() => {
-        const nextVal = Math.floor(Math.random() * 35) + 35; // 35 - 70 range
+        const openCount = parseInt(document.getElementById('dash-total-open')?.textContent || "0");
+        const nextVal = openCount > 0 ? Math.min(80, openCount * 18 + Math.floor(Math.random() * 8)) : 5;
         points.push(nextVal);
         if (points.length > maxPoints) {
             points.shift();
         }
         drawChart();
-
-        // Update live rate display
-        const rateElem = document.getElementById('ingest-rate-live');
-        if (rateElem) {
-            const rate = (nextVal / 60).toFixed(1);
-            rateElem.textContent = `${rate} events/sec`;
-        }
-    }, 1500);
+    }, 2000);
 }
 
 function initPlatformTabs() {
@@ -241,6 +291,25 @@ async function loadStatus() {
         if (document.getElementById('dash-low-count')) document.getElementById('dash-low-count').textContent = data.low_count || 0;
         if (document.getElementById('dash-sys-status')) document.getElementById('dash-sys-status').textContent = data.status ? data.status.toUpperCase() : 'ONLINE';
         if (document.getElementById('dash-org-name')) document.getElementById('dash-org-name').textContent = `Organization: ${data.organization || 'MITS'}`;
+        if (document.getElementById('ingest-rate-live')) document.getElementById('ingest-rate-live').textContent = data.ingestion_rate || '0.0 events/sec';
+
+        // Update 1-2 Word Minimal Health Badges
+        const badgeHec = document.getElementById('badge-hec');
+        const badgeCensys = document.getElementById('badge-censys');
+        const badgeReconcile = document.getElementById('badge-reconcile');
+
+        if (badgeHec) {
+            badgeHec.textContent = data.hec_badge || 'Connected';
+            badgeHec.className = `badge-status ${data.hec_badge === 'Disconnected' ? 'red' : 'green'}`;
+        }
+        if (badgeCensys) {
+            badgeCensys.textContent = data.censys_badge || 'Active';
+            badgeCensys.className = `badge-status ${data.censys_badge === 'Inactive' ? 'red' : 'green'}`;
+        }
+        if (badgeReconcile) {
+            badgeReconcile.textContent = data.reconcile_badge || 'Operational';
+            badgeReconcile.className = 'badge-status green';
+        }
 
         // Direct Dashboard Studio Link
         const dashUrl = data.splunk_dashboard_url || "http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor";
@@ -413,32 +482,6 @@ async function deleteAsset(val) {
         }
     } catch (e) {
         showToast("Error removing asset.");
-    }
-}
-
-async function resetAssetInventory() {
-    const userInput = prompt("Are you sure you wanted to delete this asset inventory?\n\nTo proceed, type exactly:\ndelete my asset inventory");
-    if (!userInput || userInput.trim() !== "delete my asset inventory") {
-        showToast("Reset cancelled. Confirmation string mismatch.");
-        return;
-    }
-
-    try {
-        const res = await fetch('/api/assets/reset', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ confirmation: userInput.trim() })
-        });
-        const data = await res.json();
-        if (data.success) {
-            showToast("Asset inventory and dashboard exposure values successfully reset!");
-            loadAssets();
-            loadStatus();
-        } else {
-            showToast("Reset failed: " + data.message);
-        }
-    } catch (err) {
-        showToast("Error resetting inventory.");
     }
 }
 

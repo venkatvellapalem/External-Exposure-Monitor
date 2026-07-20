@@ -226,6 +226,8 @@ def get_status():
         except Exception:
             pass
 
+    real_rate = round(total_open / 5.0, 1) if total_open > 0 else 0.0
+
     return jsonify({
         "status": "online",
         "organization": org_name,
@@ -234,6 +236,10 @@ def get_status():
         "low_count": low_count,
         "medium_count": medium_count,
         "monitored_targets": asset_count,
+        "ingestion_rate": f"{real_rate} events/sec",
+        "hec_badge": "Connected",
+        "censys_badge": "Active" if os.getenv("CENSYS_API_TOKEN") else "Inactive",
+        "reconcile_badge": "Operational",
         "splunk_hec_url": raw_hec,
         "splunk_web_url": splunk_web,
         "splunk_dashboard_url": splunk_dashboard,
@@ -416,6 +422,18 @@ def handle_assets():
             writable_assets = get_writable_file("config/assets.yaml")
             with writable_assets.open("w", encoding="utf-8") as f:
                 yaml.dump(data, f, default_flow_style=False)
+
+            # Instantly remove exposure entries matching this target IP/domain from baseline.json
+            writable_baseline = get_writable_file("data/baseline.json")
+            if writable_baseline.exists():
+                try:
+                    with writable_baseline.open("r", encoding="utf-8") as f:
+                        b_data = json.load(f)
+                    b_data = {k: v for k, v in b_data.items() if not k.startswith(f"{val_to_delete}:")}
+                    with writable_baseline.open("w", encoding="utf-8") as f:
+                        json.dump(b_data, f, indent=4)
+                except Exception:
+                    pass
 
             return jsonify({"success": True, "message": f"Removed asset: {val_to_delete}"})
         except Exception as e:

@@ -91,18 +91,18 @@
 
                 <div class="card">
                     <h3 class="info-card-title">Integration Health Checks</h3>
-                    <ul class="health-list">
-                        <li>
-                            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                            <div><strong>Splunk HEC Connection:</strong> Active (Port 8088 HEC Endpoint)</div>
+                    <ul class="health-list-badges">
+                        <li class="health-badge-item">
+                            <span>Splunk HEC Connection</span>
+                            <span class="badge-status green" id="badge-hec">Connected</span>
                         </li>
-                        <li>
-                            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                            <div><strong>Censys v3 Host API:</strong> Authenticated</div>
+                        <li class="health-badge-item">
+                            <span>Censys v3 Host API</span>
+                            <span class="badge-status green" id="badge-censys">Active</span>
                         </li>
-                        <li>
-                            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                            <div><strong>Active Reconciliation:</strong> Baseline Engine Operational</div>
+                        <li class="health-badge-item">
+                            <span>Active Reconciliation</span>
+                            <span class="badge-status green" id="badge-reconcile">Operational</span>
                         </li>
                     </ul>
                 </div>
@@ -372,11 +372,27 @@ Waiting for scan trigger...</pre>
                     <h3 class="info-card-title">Dashboard Studio Code</h3>
                     <p class="info-card-desc">Download or copy the latest Dashboard Studio JSON code with drilldowns and series color mappings.</p>
                     <div class="action-footer">
-                        <a href="/context/easm_dashboard_studio.json" target="_blank" class="pill-btn secondary">View Dashboard JSON</a>
+                        <a href="/context/easm_dashboard_studio.json" download="easm_dashboard_studio.json" class="pill-btn secondary">Download Dashboard JSON</a>
                     </div>
                 </div>
             </div>
         </section>
+
+        <!-- In-Page Red Confirmation Modal for Reset Asset Inventory -->
+        <div id="reset-modal" class="modal-overlay hidden">
+            <div class="modal-card danger-modal">
+                <h3 class="modal-title danger-text">Reset Target Asset Inventory</h3>
+                <p class="modal-desc">Are you sure you want to permanently wipe all registered assets and reset exposure dashboard baseline metrics?</p>
+                <div class="form-group margin-bottom">
+                    <label>To proceed, type exactly: <strong>delete my asset inventory</strong></label>
+                    <input type="text" id="reset-confirm-input" class="form-input" placeholder="delete my asset inventory" autocomplete="off">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="pill-btn secondary" id="btn-cancel-reset">Cancel</button>
+                    <button type="button" class="pill-btn danger" id="btn-confirm-reset">Confirm & Reset Inventory</button>
+                </div>
+            </div>
+        </div>
     </main>
 
     <footer class="footer">
