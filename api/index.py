@@ -3,8 +3,10 @@ import json
 import subprocess
 import urllib.request
 import urllib.error
+import urllib.parse
 import ssl
 import yaml
+import base64
 from pathlib import Path
 from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
@@ -47,6 +49,68 @@ def get_baseline_path():
         return target
     return get_writable_file("data/baseline.json")
 
+def normalize_splunk_url(url: str) -> str:
+    """Ensures HEC URL has proper scheme, port 8088, and endpoint path."""
+    url = url.strip()
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = "https://" + url
+    if ":8088" not in url and not url.endswith(":8088"):
+        if "/" in url.replace("https://", "").replace("http://", ""):
+            scheme, rest = url.split("://", 1)
+            host, path = rest.split("/", 1)
+            url = f"{scheme}://{host}:8088/{path}"
+        else:
+            url = url + ":8088"
+    if "/services/collector/event" not in url and "/services/collector" not in url:
+        url = url.rstrip("/") + "/services/collector/event"
+    return url
+
+def extract_splunk_host(raw_url: str) -> str:
+    """Extracts host IP or hostname from Splunk URL."""
+    if not raw_url:
+        return "13.205.90.142"
+    clean_url = raw_hec = raw_url.strip()
+    if "://" in clean_url:
+        host = clean_url.split("://", 1)[1].split("/", 1)[0].split(":", 1)[0]
+    else:
+        host = clean_url.split("/", 1)[0].split(":", 1)[0]
+    return host or "13.205.90.142"
+
+def query_splunk_rest_api(host: str, username: str = "admin", password: str = "Splunk@2026Secure!"):
+    """Queries Splunk REST Management API (Port 8089) for real-time events."""
+    creds = base64.b64encode(f"{username}:{password}".encode()).decode()
+    headers = {
+        "Authorization": f"Basic {creds}",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    data = urllib.parse.urlencode({
+        "search": "search index=* source=easm_collector | dedup ip, port | head 20",
+        "output_mode": "json"
+    }).encode('utf-8')
+
+    url = f"https://{host}:8089/services/search/jobs/export"
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+    events = []
+    try:
+        with urllib.request.urlopen(req, context=ctx, timeout=3) as response:
+            for line in response.readlines():
+                line_str = line.decode('utf-8').strip()
+                if line_str:
+                    try:
+                        obj = json.loads(line_str)
+                        if "result" in obj and "_raw" in obj["result"]:
+                            raw_data = json.loads(obj["result"]["_raw"])
+                            events.append(raw_data)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return events
+
 @app.route('/')
 @app.route('/dashboard')
 @app.route('/download')
@@ -83,30 +147,53 @@ def serve_js():
 
 @app.route('/api/status', methods=['GET'])
 def get_status():
-    baseline_path = get_baseline_path()
+    raw_hec = os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
+    host = extract_splunk_host(raw_hec)
+
+    # Calculate dynamic Splunk Web & Dashboard Studio links
+    splunk_web = f"http://{host}:8000"
+    splunk_dashboard = f"http://{host}:8000/en-GB/app/search/external_attack_surface_monitor"
+
     total_open = 0
     critical_count = 0
     low_count = 0
     medium_count = 0
     exposures_list = []
 
-    if baseline_path.exists():
-        try:
-            with baseline_path.open('r', encoding='utf-8') as f:
-                data = json.load(f)
-                for key, val in data.items():
-                    if val == "open":
-                        total_open += 1
-                        ip, port = key.split(":")
-                        port_num = int(port)
-                        risk = "Critical" if port_num in {3389, 23} else ("High" if port_num in {445, 21, 22} else "Low")
-                        if risk == "Critical": critical_count += 1
-                        elif risk == "Low": low_count += 1
-                        else: medium_count += 1
+    # Attempt real-time query to Splunk REST API first
+    splunk_events = query_splunk_rest_api(host)
+    if splunk_events:
+        for ev in splunk_events:
+            status = ev.get("status", "open")
+            if status == "open":
+                total_open += 1
+                ip = ev.get("ip", "")
+                port_num = int(ev.get("port", 0))
+                risk = ev.get("risk") or ("Critical" if port_num in {3389, 23} else ("High" if port_num in {445, 21, 22} else "Low"))
+                if risk == "Critical": critical_count += 1
+                elif risk == "Low": low_count += 1
+                else: medium_count += 1
+                exposures_list.append({"ip": ip, "port": port_num, "risk": risk, "status": "open"})
+    else:
+        # Fallback to local baseline engine state
+        baseline_path = get_baseline_path()
+        if baseline_path.exists():
+            try:
+                with baseline_path.open('r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    for key, val in data.items():
+                        if val == "open":
+                            total_open += 1
+                            ip, port = key.split(":")
+                            port_num = int(port)
+                            risk = "Critical" if port_num in {3389, 23} else ("High" if port_num in {445, 21, 22} else "Low")
+                            if risk == "Critical": critical_count += 1
+                            elif risk == "Low": low_count += 1
+                            else: medium_count += 1
 
-                        exposures_list.append({"ip": ip, "port": port_num, "risk": risk, "status": "open"})
-        except Exception:
-            pass
+                            exposures_list.append({"ip": ip, "port": port_num, "risk": risk, "status": "open"})
+            except Exception:
+                pass
 
     assets_path = get_assets_path()
     asset_count = 0
@@ -121,17 +208,6 @@ def get_status():
                         asset_count = len(a_data["assets"])
         except Exception:
             pass
-
-    raw_hec = os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
-    
-    # Calculate Splunk Web UI on port 8000
-    splunk_web = "http://13.205.90.142:8000"
-    if raw_hec.startswith("http://") or raw_hec.startswith("https://"):
-        parts = raw_hec.split("//", 1)[1].split("/", 1)[0]
-        host = parts.split(":", 1)[0]
-        splunk_web = f"http://{host}:8000"
-
-    splunk_dashboard = "http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor"
 
     return jsonify({
         "status": "online",
@@ -166,6 +242,7 @@ def handle_config():
     else:
         data = request.json or {}
         new_url = data.get("splunk_url", "").strip() or "https://13.205.90.142:8088/services/collector/event"
+        new_url = normalize_splunk_url(new_url)
         new_token = data.get("splunk_token", "").strip() or os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
         new_censys = data.get("censys_token", "").strip() or os.getenv("CENSYS_API_TOKEN", "censys_EoyeoHTw_4Bqv968FBtRVrrQ9fZrJNisw")
         new_timeout = data.get("scan_timeout", "2.5").strip()
@@ -185,11 +262,13 @@ def handle_config():
 @app.route('/api/test-hec', methods=['POST'])
 def test_hec():
     data = request.json or {}
-    url = data.get("splunk_url") or os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
+    raw_url = data.get("splunk_url") or os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
     token = data.get("splunk_token") or os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
 
-    if not url or not token:
+    if not raw_url or not token:
         return jsonify({"success": False, "message": "Splunk URL and HEC Token are required."})
+
+    target_url = normalize_splunk_url(raw_url)
 
     headers = {
         "Authorization": f"Splunk {token}",
@@ -200,22 +279,31 @@ def test_hec():
         "source": "easm_web_test",
         "event": {"message": "Splunk connection test from EASM Web Interface."}
     }).encode('utf-8')
-    
-    req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
+
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
 
-    try:
-        with urllib.request.urlopen(req, context=ctx, timeout=5) as response:
-            if response.status == 200:
-                return jsonify({"success": True, "message": "Splunk HEC connection successful!"})
-    except urllib.error.HTTPError as e:
-        return jsonify({"success": False, "message": f"HTTP Error {e.code}: HEC rejected token."})
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Connection failed: {str(e)}"})
-        
-    return jsonify({"success": False, "message": "Unknown connection error."})
+    # Try test with scheme fallbacks (https then http)
+    schemes_to_test = [target_url]
+    if target_url.startswith("https://"):
+        schemes_to_test.append(target_url.replace("https://", "http://"))
+    elif target_url.startswith("http://"):
+        schemes_to_test.append(target_url.replace("http://", "https://"))
+
+    last_error = None
+    for test_url in schemes_to_test:
+        req = urllib.request.Request(test_url, data=payload, headers=headers, method='POST')
+        try:
+            with urllib.request.urlopen(req, context=ctx, timeout=5) as response:
+                if response.status == 200:
+                    return jsonify({"success": True, "message": f"Splunk HEC connection successful! ({test_url})"})
+        except urllib.error.HTTPError as e:
+            return jsonify({"success": False, "message": f"HTTP Error {e.code}: HEC rejected token."})
+        except Exception as e:
+            last_error = str(e)
+
+    return jsonify({"success": False, "message": f"Connection failed: {last_error}"})
 
 @app.route('/api/assets', methods=['GET', 'POST', 'DELETE'])
 def handle_assets():
