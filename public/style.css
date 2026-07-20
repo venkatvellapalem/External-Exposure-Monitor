@@ -996,6 +996,61 @@ body {
     width: 100%;
 }
 
+.auth-screen-view {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #09090b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    padding: 16px;
+}
+
+.auth-screen-view.hidden {
+    display: none !important;
+}
+
+.auth-card-wrapper {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 440px;
+    padding: 32px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+}
+
+.auth-brand-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.auth-brand-header .brand-icon {
+    width: 28px;
+    height: 28px;
+    color: #3b82f6;
+}
+
+.auth-brand-header .brand-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #f4f4f5;
+    letter-spacing: -0.3px;
+}
+
+.app-main-view.hidden {
+    display: none !important;
+}
+
 .user-badge-container {
     display: flex;
     align-items: center;

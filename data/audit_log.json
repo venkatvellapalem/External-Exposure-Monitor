@@ -1,5 +1,25 @@
 [
   {
+    "id": "359e64070a36",
+    "timestamp": "2026-07-20T17:43:30.584318+00:00",
+    "username": "analyst1",
+    "role": "soc_analyst",
+    "action": "USER_CREATED",
+    "details": "User account 'analyst1' created with role 'soc_analyst'",
+    "category": "IAM",
+    "severity": "INFO"
+  },
+  {
+    "id": "7da203abe01a",
+    "timestamp": "2026-07-20T17:42:40.759571+00:00",
+    "username": "analyst1",
+    "role": "soc_analyst",
+    "action": "USER_CREATED",
+    "details": "User account 'analyst1' created with role 'soc_analyst'",
+    "category": "IAM",
+    "severity": "INFO"
+  },
+  {
     "id": "d24e6f8139d3",
     "timestamp": "2026-07-20T17:25:24.727846+00:00",
     "username": "analyst1",

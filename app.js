@@ -117,6 +117,17 @@ function initNavigation() {
 }
 
 function switchTab(tabId, updateUrl = true) {
+    const targetSlug = TAB_SLUG_MAP[tabId] || 'dashboard';
+
+    // Strict RBAC Enforcement: Non-root_admin users CANNOT access IAM or Config
+    if ((tabId === 'tab-iam' || tabId === 'tab-config' || targetSlug === 'iam' || targetSlug === 'config') && currentUser?.role !== 'root_admin') {
+        showToast("Access Denied: Root Admin authorization required.", "error");
+        if (window.location.pathname !== '/dashboard') {
+            window.history.replaceState(null, '', '/dashboard');
+        }
+        tabId = 'tab-dashboard';
+    }
+
     document.querySelectorAll('.nav-link').forEach(link => {
         link.classList.toggle('active', link.getAttribute('data-tab') === tabId);
     });
@@ -143,7 +154,17 @@ function switchTab(tabId, updateUrl = true) {
 }
 
 function handlePopState(e) {
+    if (!currentUser) return;
     const path = window.location.pathname.replace('/', '').toLowerCase();
+
+    // Strict RBAC Enforcement on URL navigation
+    if ((path === 'iam' || path === 'config') && currentUser.role !== 'root_admin') {
+        showToast("Access Denied: Root Admin authorization required.", "error");
+        window.history.replaceState(null, '', '/dashboard');
+        switchTab('tab-dashboard', false);
+        return;
+    }
+
     if (SLUG_TAB_MAP[path]) {
         switchTab(SLUG_TAB_MAP[path], false);
     } else {
@@ -162,6 +183,11 @@ async function checkAuthSession() {
             hideAuthModal();
             showUserBadge(data.username, data.role);
             applyRbacUI(data.role);
+
+            // Fetch protected data ONLY after authentication is verified
+            loadStatus();
+            loadConfig();
+            loadAssets();
         } else {
             showAuthModal('login');
         }
@@ -171,27 +197,34 @@ async function checkAuthSession() {
 }
 
 function showAuthModal(screenName = 'login') {
-    const modal = document.getElementById('auth-modal');
-    if (!modal) return;
-    modal.classList.remove('hidden');
+    const authScreenView = document.getElementById('auth-screen-view');
+    const appMainView = document.getElementById('app-main-view');
+    if (authScreenView) authScreenView.classList.remove('hidden');
+    if (appMainView) appMainView.classList.add('hidden');
 
     clearAuthErrors();
     document.querySelectorAll('.auth-screen').forEach(s => s.classList.add('hidden'));
 
     if (screenName === 'login') {
         document.getElementById('auth-screen-login')?.classList.remove('hidden');
+        document.getElementById('auth-login-username')?.focus();
     } else if (screenName === 'mfa') {
         document.getElementById('auth-screen-mfa')?.classList.remove('hidden');
+        document.getElementById('auth-totp-code')?.focus();
     } else if (screenName === 'password') {
         document.getElementById('auth-screen-password')?.classList.remove('hidden');
+        document.getElementById('auth-new-password')?.focus();
     } else if (screenName === 'recovery') {
         document.getElementById('auth-screen-recovery')?.classList.remove('hidden');
+        document.getElementById('rec-master-key')?.focus();
     }
 }
 
 function hideAuthModal() {
-    const modal = document.getElementById('auth-modal');
-    if (modal) modal.classList.add('hidden');
+    const authScreenView = document.getElementById('auth-screen-view');
+    const appMainView = document.getElementById('app-main-view');
+    if (authScreenView) authScreenView.classList.add('hidden');
+    if (appMainView) appMainView.classList.remove('hidden');
     clearAuthErrors();
 }
 
@@ -212,22 +245,26 @@ function showUserBadge(username, role) {
 }
 
 function applyRbacUI(role) {
+    const isRootAdmin = (role === 'root_admin');
+
     const iamDropdownItem = document.getElementById('dropdown-item-iam');
+    const configDropdownItem = document.getElementById('dropdown-item-config');
     const drawerIamItem = document.getElementById('drawer-link-iam');
+    const drawerConfigItem = document.getElementById('drawer-link-config');
     const drawerLogsItem = document.getElementById('drawer-link-logs');
 
-    const isRootAdmin = (role === 'root_admin');
     if (iamDropdownItem) iamDropdownItem.style.display = isRootAdmin ? 'flex' : 'none';
+    if (configDropdownItem) configDropdownItem.style.display = isRootAdmin ? 'flex' : 'none';
     if (drawerIamItem) drawerIamItem.style.display = isRootAdmin ? 'flex' : 'none';
+    if (drawerConfigItem) drawerConfigItem.style.display = isRootAdmin ? 'flex' : 'none';
     if (drawerLogsItem) drawerLogsItem.style.display = (isRootAdmin || role === 'soc_analyst') ? 'flex' : 'none';
 
     if (role === 'read_only_auditor') {
-        const runScanBtn = document.getElementById('btn-run-scan');
-        const resetInvBtn = document.getElementById('btn-reset-inventory');
-        const resetCfgBtn = document.getElementById('btn-reset-config');
-        if (runScanBtn) runScanBtn.disabled = true;
-        if (resetInvBtn) resetInvBtn.disabled = true;
-        if (resetCfgBtn) resetCfgBtn.disabled = true;
+        document.querySelectorAll('.btn-danger, #btn-run-scan, #btn-reset-inventory, #btn-reset-config').forEach(el => {
+            el.disabled = true;
+            el.style.opacity = '0.5';
+            el.style.cursor = 'not-allowed';
+        });
     }
 }
 
@@ -421,6 +458,8 @@ function initAuthFlow() {
             });
             const data = await res.json();
             if (data.success) {
+                failedLoginAttempts = 0;
+                document.getElementById('btn-show-recovery')?.classList.add('hidden');
                 pendingAuthUser = data;
                 
                 const mfaRes = await fetch('/api/auth/mfa-setup', {
@@ -446,9 +485,17 @@ function initAuthFlow() {
                 }
                 showAuthModal('mfa');
             } else {
+                failedLoginAttempts++;
+                if (failedLoginAttempts >= 2) {
+                    document.getElementById('btn-show-recovery')?.classList.remove('hidden');
+                }
                 showAuthError('auth-login-error', "Login failed: " + data.message);
             }
         } catch (err) {
+            failedLoginAttempts++;
+            if (failedLoginAttempts >= 2) {
+                document.getElementById('btn-show-recovery')?.classList.remove('hidden');
+            }
             showAuthError('auth-login-error', "Connection error during login.");
         }
     });

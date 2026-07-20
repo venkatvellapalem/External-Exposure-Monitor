@@ -5,7 +5,7 @@
         "role": "root_admin",
         "must_change_password": true,
         "mfa_enabled": true,
-        "mfa_secret": "FC7EQFJPRR6QUE5LZCZHW4XJPIQOQOPM",
+        "mfa_secret": "WVQLZGBP52DZHHC6KS2ECFVEGLOT2ED5",
         "recovery_key": "EASM-RECOVER-4CC4-55CB-5D74-AEFF",
         "recovery_key_hash": "$2b$12$L3whao350NjceU8Xt6.ZWOLRmiHIPDZ0OfmkKMEBrZ5.6L9cowXbq",
         "created_at": "2026-07-20T16:02:11.003566+00:00",
@@ -22,20 +22,20 @@
     },
     "tempuser1": {
         "username": "tempuser1",
-        "password_hash": "$2b$12$FiJl/Xl61L0N/JGA3xdD/uD24qAc0soe9VbDB1D8rLyxyhG60fi/m",
+        "password_hash": "$2b$12$dZETzwKzCHZI3S5/0/C9LO6o4.MvZRCxcjX84N2gCQE/r2Bs6bIsO",
         "role": "soc_analyst",
         "must_change_password": true,
         "mfa_enabled": false,
         "mfa_secret": "",
-        "created_at": "2026-07-20T17:22:12.413112+00:00"
+        "created_at": "2026-07-20T17:42:42.264866+00:00"
     },
     "analyst1": {
         "username": "analyst1",
-        "password_hash": "$2b$12$6F566lnzzPz.ii3NoLK3nOohb.ctG82xEiR3kqVuNH4N6NlqyCzRC",
+        "password_hash": "$2b$12$lVeEURNLt02qzldV51Cjs.4noy6.WsFGehO9ZLTFO5dCpUvQwIeOy",
         "role": "soc_analyst",
         "must_change_password": true,
         "mfa_enabled": false,
         "mfa_secret": "",
-        "created_at": "2026-07-20T17:25:24.724559+00:00"
+        "created_at": "2026-07-20T17:43:30.579765+00:00"
     }
 }
