@@ -1,5 +1,25 @@
 [
   {
+    "id": "2a32ac7d1723",
+    "timestamp": "2026-07-20T17:16:04.645208+00:00",
+    "username": "tempuser1",
+    "role": "soc_analyst",
+    "action": "USER_CREATED",
+    "details": "User account 'tempuser1' created with role 'soc_analyst'",
+    "category": "IAM",
+    "severity": "INFO"
+  },
+  {
+    "id": "02628fda31a1",
+    "timestamp": "2026-07-20T17:16:04.254555+00:00",
+    "username": "tempuser1",
+    "role": "user",
+    "action": "USER_REVOKED",
+    "details": "User account 'tempuser1' revoked by admin",
+    "category": "IAM",
+    "severity": "WARNING"
+  },
+  {
     "id": "6ad62e94b071",
     "timestamp": "2026-07-20T17:11:18.043055+00:00",
     "username": "tempuser1",

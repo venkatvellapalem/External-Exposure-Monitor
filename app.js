@@ -1279,7 +1279,10 @@ async function saveConfig(e) {
         });
         const data = await res.json();
         if (data.success) {
-            showToast("System settings saved successfully!");
+            if (data.updated_url && document.getElementById('cfg-splunk-url')) {
+                document.getElementById('cfg-splunk-url').value = data.updated_url;
+            }
+            showToast(data.message || "System settings saved successfully!");
             loadStatus();
         } else {
             showToast("Failed to save config: " + data.message);
@@ -1290,35 +1293,12 @@ async function saveConfig(e) {
 }
 
 async function testHec() {
-    const url = document.getElementById('cfg-splunk-url').value;
-    const token = document.getElementById('cfg-splunk-token').value;
+    const urlInput = document.getElementById('cfg-splunk-url');
+    const tokenInput = document.getElementById('cfg-splunk-token');
+    const url = urlInput ? urlInput.value.trim() : '';
+    const token = tokenInput ? tokenInput.value.trim() : '';
 
     showToast("Testing connection to Splunk HEC...");
-
-    try {
-        const payload = JSON.stringify({
-            sourcetype: "_json",
-            source: "easm_web_browser_test",
-            event: { message: "Splunk connection test from browser client." }
-        });
-
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Splunk ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: payload,
-            mode: 'cors'
-        });
-
-        if (res.ok) {
-            showToast("Splunk HEC connection successful! (Direct browser test)");
-            return;
-        }
-    } catch (browserErr) {
-        console.log("Direct browser test failed or CORS restricted, attempting server proxy...", browserErr);
-    }
 
     try {
         const res = await fetch('/api/test-hec', {
@@ -1327,6 +1307,9 @@ async function testHec() {
             body: JSON.stringify({ splunk_url: url, splunk_token: token })
         });
         const data = await res.json();
+        if (data.updated_url && urlInput) {
+            urlInput.value = data.updated_url;
+        }
         showToast(data.message);
     } catch (err) {
         showToast("Connection test failed.");

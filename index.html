@@ -422,27 +422,37 @@ Waiting for scan trigger...</pre>
                 <form id="form-config" class="config-form">
                     <div class="form-row">
                         <div class="form-group half">
-                            <label>Organization Name</label>
+                            <label>Organization Name <span class="required-asterisk">*(required)</span></label>
                             <input type="text" id="cfg-org-name" class="form-input" placeholder="MITS" required>
                         </div>
                         <div class="form-group half">
-                            <label>Scan Connection Timeout (Seconds)</label>
+                            <label>Scan Connection Timeout (Seconds) <span class="required-asterisk">*(required)</span></label>
                             <input type="number" step="0.5" id="cfg-scan-timeout" class="form-input" value="2.5" required>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group full">
-                            <label>Splunk HEC URL (Port 8088 Endpoint)</label>
+                            <label style="display:flex; align-items:center; gap:6px;">
+                                <span>Splunk HEC URL (Port 8088 Endpoint) <span class="required-asterisk">*(required)</span></span>
+                                <span class="info-tooltip-trigger" data-tooltip="Supports raw IP, IP:Port (13.205.90.142:8088), domain, or full URL with/without scheme. Automatic HEC path normalization and HTTPS/HTTP fallback active.">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; color:var(--text-muted, #71717a); cursor:pointer;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                </span>
+                            </label>
                             <input type="url" id="cfg-splunk-url" class="form-input" placeholder="https://13.205.90.142:8088/services/collector/event" required>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group half">
-                            <label>Splunk HEC Token</label>
+                            <label>Splunk HEC Token <span class="required-asterisk">*(required)</span></label>
                             <input type="password" id="cfg-splunk-token" class="form-input" placeholder="••••••••••••••••">
                         </div>
                         <div class="form-group half">
-                            <label>Censys Personal Access Token (PAT)</label>
+                            <label style="display:flex; align-items:center; gap:6px;">
+                                <span>Censys Personal Access Token (PAT)</span>
+                                <span class="info-tooltip-trigger" data-tooltip="Optional API token for automated passive threat intelligence certificate discovery via Censys API.">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; color:var(--text-muted, #71717a); cursor:pointer;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                </span>
+                            </label>
                             <input type="password" id="cfg-censys-token" class="form-input" placeholder="••••••••••••••••">
                         </div>
                     </div>

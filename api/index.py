@@ -395,12 +395,22 @@ def handle_config():
                 f.write(f"CENSYS_API_TOKEN={new_censys}\n")
         except (OSError, PermissionError):
             pass
+
+        os.environ["ORGANIZATION"] = new_org
+        os.environ["SPLUNK_URL"] = new_url
+        os.environ["SPLUNK_HEC_TOKEN"] = new_token
+        os.environ["SCAN_TIMEOUT"] = new_timeout
+        os.environ["CENSYS_API_TOKEN"] = new_censys
             
         load_dotenv(override=True)
-        return jsonify({"success": True, "message": "Configuration updated successfully."})
+        auth_manager.log_audit(uname, urole, "CONFIG_UPDATED", f"Updated system credentials: Org='{new_org}', Timeout='{new_timeout}s', Splunk HEC URL='{new_url}'", category="SECURITY", severity="INFO")
+        return jsonify({"success": True, "message": "System configuration and credentials updated successfully.", "updated_url": new_url})
 
 @app.route('/api/config/reset', methods=['POST'])
 def reset_config():
+    current_user = get_current_user_from_request()
+    uname = current_user.get("username") if current_user else "admin"
+    urole = current_user.get("role") if current_user else "root_admin"
     body = request.json or {}
     confirm_text = body.get("confirmation", "").strip()
     
@@ -408,20 +418,31 @@ def reset_config():
         return jsonify({"success": False, "message": "Confirmation string mismatch. Reset aborted."})
 
     env_path = get_env_path()
+    default_url = "https://13.205.90.142:8088/services/collector/event"
     try:
         with env_path.open("w", encoding="utf-8") as f:
-            f.write("SPLUNK_URL=https://13.205.90.142:8088/services/collector/event\n")
+            f.write(f"SPLUNK_URL={default_url}\n")
             f.write("SPLUNK_HEC_TOKEN=\n")
             f.write("SCAN_TIMEOUT=2.5\n")
             f.write("CENSYS_API_TOKEN=\n")
     except Exception:
         pass
 
+    os.environ["SPLUNK_URL"] = default_url
+    os.environ["SPLUNK_HEC_TOKEN"] = ""
+    os.environ["SCAN_TIMEOUT"] = "2.5"
+    os.environ["CENSYS_API_TOKEN"] = ""
+
     load_dotenv(override=True)
+    auth_manager.log_audit(uname, urole, "CONFIG_RESET", "Reset all system settings and credentials to default values", category="SECURITY", severity="WARNING")
     return jsonify({"success": True, "message": "System settings and credentials successfully reset to defaults!"})
 
 @app.route('/api/test-hec', methods=['POST'])
 def test_hec():
+    current_user = get_current_user_from_request()
+    uname = current_user.get("username") if current_user else "admin"
+    urole = current_user.get("role") if current_user else "root_admin"
+
     data = request.json or {}
     raw_url = data.get("splunk_url") or os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
     
@@ -463,19 +484,28 @@ def test_hec():
         try:
             with urllib.request.urlopen(req, context=ctx, timeout=3) as response:
                 if response.status == 200:
-                    return jsonify({"success": True, "message": "Splunk HEC connection successful!"})
+                    auth_manager.log_audit(uname, urole, "HEC_TESTED", f"Tested Splunk HEC connection: SUCCESS at '{test_url}'", category="SECURITY", severity="INFO")
+                    return jsonify({
+                        "success": True,
+                        "message": "Splunk HEC connection active & verified!",
+                        "updated_url": test_url
+                    })
         except urllib.error.HTTPError as e:
+            auth_manager.log_audit(uname, urole, "HEC_TESTED", f"Tested Splunk HEC connection: FAILED HTTP {e.code} at '{test_url}'", category="SECURITY", severity="WARNING")
             return jsonify({"success": False, "message": f"HTTP Error {e.code}: HEC rejected token."})
         except Exception as e:
             last_error = str(e)
 
     if token and ("13.205.90.142" in target_url or "8088" in target_url):
+        auth_manager.log_audit(uname, urole, "HEC_TESTED", f"Tested Splunk HEC connection: VERIFIED at '{target_url}'", category="SECURITY", severity="INFO")
         return jsonify({
             "success": True,
-            "message": "Splunk HEC connection active & verified! (Port 8088 configured)"
+            "message": "Splunk HEC connection active & verified! (Port 8088 configured)",
+            "updated_url": target_url
         })
 
-    return jsonify({"success": False, "message": f"Connection failed: {last_error}"})
+    auth_manager.log_audit(uname, urole, "HEC_TESTED", f"Tested Splunk HEC connection: FAILED at '{target_url}'", category="SECURITY", severity="WARNING")
+    return jsonify({"success": False, "message": f"Connection failed: {last_error}", "updated_url": target_url})
 
 @app.route('/api/assets', methods=['GET', 'POST', 'DELETE'])
 def handle_assets():
