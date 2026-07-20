@@ -494,6 +494,9 @@ Waiting for scan trigger...</pre>
                 <div id="auth-screen-login" class="auth-screen">
                     <h3 class="modal-title">EASM Authentication</h3>
                     <p class="modal-desc">Enter your credentials to authenticate into the External Exposure Engine.</p>
+                    
+                    <div id="auth-login-error" class="auth-error-banner hidden"></div>
+
                     <form id="form-auth-login">
                         <div class="form-group margin-bottom">
                             <label>Username</label>
@@ -501,7 +504,15 @@ Waiting for scan trigger...</pre>
                         </div>
                         <div class="form-group margin-bottom">
                             <label>Password</label>
-                            <input type="password" id="auth-login-password" class="form-input" placeholder="" required autocomplete="current-password">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="auth-login-password" class="form-input" placeholder="" required autocomplete="current-password">
+                                <button type="button" class="btn-toggle-pass" data-target="auth-login-password" title="Toggle Password Visibility">
+                                    <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         <div class="modal-actions">
                             <button type="submit" class="pill-btn primary full-width">Sign In</button>
@@ -519,6 +530,8 @@ Waiting for scan trigger...</pre>
                         <div class="qr-manual-key">Manual Key: <strong id="auth-mfa-secret-key"></strong></div>
                     </div>
 
+                    <div id="auth-mfa-error" class="auth-error-banner hidden"></div>
+
                     <form id="form-auth-mfa">
                         <div class="form-group margin-bottom">
                             <label>6-Digit Authenticator Code</label>
@@ -534,14 +547,33 @@ Waiting for scan trigger...</pre>
                 <div id="auth-screen-password" class="auth-screen hidden">
                     <h3 class="modal-title danger-text">Mandatory Password Update</h3>
                     <p class="modal-desc">Your account requires setting a 16+ character strong password (min 16 chars, uppercase, lowercase, number, special char).</p>
+                    
+                    <div id="auth-pass-error" class="auth-error-banner hidden"></div>
+
                     <form id="form-auth-password">
                         <div class="form-group margin-bottom">
                             <label>New Compliant Password</label>
-                            <input type="password" id="auth-new-password" class="form-input" placeholder="" required autocomplete="new-password">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="auth-new-password" class="form-input" placeholder="" required autocomplete="new-password">
+                                <button type="button" class="btn-toggle-pass" data-target="auth-new-password" title="Toggle Password Visibility">
+                                    <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         <div class="form-group margin-bottom">
                             <label>Confirm New Password</label>
-                            <input type="password" id="auth-confirm-password" class="form-input" placeholder="" required autocomplete="new-password">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="auth-confirm-password" class="form-input" placeholder="" required autocomplete="new-password">
+                                <button type="button" class="btn-toggle-pass" data-target="auth-confirm-password" title="Toggle Password Visibility">
+                                    <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         <div class="modal-actions">
                             <button type="submit" class="pill-btn danger full-width">Update Password & Continue</button>

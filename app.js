@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initConfigResetModal();
     initLiveIngestionCanvas();
     initAuthFlow();
+    initPasswordToggles();
 
     checkAuthSession();
     loadStatus();
@@ -123,6 +124,7 @@ function showAuthModal(screenName = 'login') {
     if (!modal) return;
     modal.classList.remove('hidden');
 
+    clearAuthErrors();
     document.querySelectorAll('.auth-screen').forEach(s => s.classList.add('hidden'));
 
     if (screenName === 'login') {
@@ -137,6 +139,7 @@ function showAuthModal(screenName = 'login') {
 function hideAuthModal() {
     const modal = document.getElementById('auth-modal');
     if (modal) modal.classList.add('hidden');
+    clearAuthErrors();
 }
 
 function showUserBadge(username, role) {
@@ -164,10 +167,56 @@ function applyRbacUI(role) {
     }
 }
 
+function initPasswordToggles() {
+    document.querySelectorAll('.btn-toggle-pass').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = btn.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            if (!input) return;
+
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+
+            const svg = btn.querySelector('.eye-icon');
+            if (svg) {
+                if (isPassword) {
+                    svg.innerHTML = `
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                    `;
+                } else {
+                    svg.innerHTML = `
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    `;
+                }
+            }
+        });
+    });
+}
+
+function showAuthError(bannerId, message) {
+    const banner = document.getElementById(bannerId);
+    if (banner) {
+        banner.textContent = message;
+        banner.classList.remove('hidden');
+    }
+    showToast(message);
+}
+
+function clearAuthErrors() {
+    document.querySelectorAll('.auth-error-banner').forEach(b => {
+        b.textContent = '';
+        b.classList.add('hidden');
+    });
+}
+
 function initAuthFlow() {
     // Step 1: Login Form
     document.getElementById('form-auth-login')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        clearAuthErrors();
         const username = document.getElementById('auth-login-username').value.trim();
         const password = document.getElementById('auth-login-password').value;
 
@@ -205,16 +254,17 @@ function initAuthFlow() {
                 }
                 showAuthModal('mfa');
             } else {
-                showToast("Login failed: " + data.message);
+                showAuthError('auth-login-error', "Login failed: " + data.message);
             }
         } catch (err) {
-            showToast("Connection error during login.");
+            showAuthError('auth-login-error', "Connection error during login.");
         }
     });
 
     // Step 2: MFA Verification Form
     document.getElementById('form-auth-mfa')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        clearAuthErrors();
         const code = document.getElementById('auth-totp-code').value.trim();
         if (!pendingAuthUser) return;
 
@@ -242,21 +292,22 @@ function initAuthFlow() {
                     loadAssets();
                 }
             } else {
-                showToast("MFA error: " + data.message);
+                showAuthError('auth-mfa-error', "MFA error: " + data.message);
             }
         } catch (err) {
-            showToast("Error verifying TOTP MFA code.");
+            showAuthError('auth-mfa-error', "Error verifying TOTP MFA code.");
         }
     });
 
-    // Step 3: Mandatory Password Update Form
+    // Step 3: Mandatory Password Reset Screen
     document.getElementById('form-auth-password')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        clearAuthErrors();
         const newPass = document.getElementById('auth-new-password').value;
         const confirmPass = document.getElementById('auth-confirm-password').value;
 
         if (newPass !== confirmPass) {
-            showToast("Passwords do not match.");
+            showAuthError('auth-pass-error', "Passwords do not match.");
             return;
         }
 
@@ -275,10 +326,10 @@ function initAuthFlow() {
                 showToast("Password updated successfully!");
                 checkAuthSession();
             } else {
-                showToast("Password error: " + data.message);
+                showAuthError('auth-pass-error', "Password error: " + data.message);
             }
         } catch (err) {
-            showToast("Error updating password.");
+            showAuthError('auth-pass-error', "Error updating password.");
         }
     });
 }
@@ -619,7 +670,7 @@ function showToast(msg) {
     container.appendChild(toast);
     setTimeout(() => {
         toast.remove();
-    }, 3500);
+    }, 4500);
 }
 
 async function loadStatus() {
