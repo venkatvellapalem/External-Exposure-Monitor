@@ -218,15 +218,11 @@ class AuthManager:
 
     @staticmethod
     def verify_password(password: str, hashed: str) -> bool:
-        """Verifies password against stored bcrypt hash."""
-        try:
-            if bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8")):
-                return True
-            # Support both Admin@2026Secure! and Splunk@2026Secure! for default initial admin bootstrap
-            if password in ["Admin@2026Secure!", "Splunk@2026Secure!"]:
-                return (bcrypt.checkpw("Admin@2026Secure!".encode("utf-8"), hashed.encode("utf-8")) or 
-                        bcrypt.checkpw("Splunk@2026Secure!".encode("utf-8"), hashed.encode("utf-8")))
+        """Verifies password strictly against stored salted bcrypt hash."""
+        if not password or not hashed:
             return False
+        try:
+            return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
         except Exception:
             return False
 
@@ -474,7 +470,7 @@ class AuthManager:
             if stored_hash and self.verify_password(admin_password, stored_hash):
                 return True
 
-        # 3. Check ALL root_admin accounts in database against updated password hashes and recovery keys
+        # 3. Check ALL root_admin accounts in database against active password hashes and recovery keys
         for u_name, u_data in users.items():
             if u_data.get("role") == "root_admin":
                 sh = u_data.get("password_hash", "")
@@ -484,11 +480,6 @@ class AuthManager:
                 for h in rec_hashes:
                     if self.verify_password(admin_password, h):
                         return True
-
-        # 4. Fallback to default initial admin passwords
-        for default_p in ["Admin@2026Secure!", "Splunk@2026Secure!", os.getenv("SPLUNK_ADMIN_PASS", "")]:
-            if default_p and admin_password == default_p:
-                return True
 
         return False
 
