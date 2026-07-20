@@ -222,5 +222,4 @@ venv/
 .env
 __pycache__/
 *.pyc
-data/baseline.json
 task.md
