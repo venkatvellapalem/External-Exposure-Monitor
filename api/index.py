@@ -21,6 +21,8 @@ app = Flask(__name__)
 handler = app
 application = app
 
+MASKED_PLACEHOLDER = "••••••••••••••••"
+
 def get_writable_file(relative_path: str) -> Path:
     target = BASE_DIR / relative_path
     try:
@@ -69,7 +71,7 @@ def extract_splunk_host(raw_url: str) -> str:
     """Extracts host IP or hostname from Splunk URL."""
     if not raw_url:
         return "13.205.90.142"
-    clean_url = raw_hec = raw_url.strip()
+    clean_url = raw_url.strip()
     if "://" in clean_url:
         host = clean_url.split("://", 1)[1].split("/", 1)[0].split(":", 1)[0]
     else:
@@ -233,18 +235,33 @@ def handle_config():
         censys = os.getenv("CENSYS_API_TOKEN", "censys_EoyeoHTw_4Bqv968FBtRVrrQ9fZrJNisw")
         timeout = os.getenv("SCAN_TIMEOUT", "2.5")
 
+        # Return masked dot strings for security (never plaintext tokens)
+        masked_token = MASKED_PLACEHOLDER if token else ""
+        masked_censys = MASKED_PLACEHOLDER if censys else ""
+
         return jsonify({
             "splunk_url": url,
-            "splunk_token": token,
-            "censys_token": censys,
+            "splunk_token": masked_token,
+            "censys_token": masked_censys,
             "scan_timeout": timeout
         })
     else:
         data = request.json or {}
         new_url = data.get("splunk_url", "").strip() or "https://13.205.90.142:8088/services/collector/event"
         new_url = normalize_splunk_url(new_url)
-        new_token = data.get("splunk_token", "").strip() or os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
-        new_censys = data.get("censys_token", "").strip() or os.getenv("CENSYS_API_TOKEN", "censys_EoyeoHTw_4Bqv968FBtRVrrQ9fZrJNisw")
+
+        input_token = data.get("splunk_token", "").strip()
+        if not input_token or "•" in input_token or "*" in input_token or input_token == MASKED_PLACEHOLDER:
+            new_token = os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
+        else:
+            new_token = input_token
+
+        input_censys = data.get("censys_token", "").strip()
+        if not input_censys or "•" in input_censys or "*" in input_censys or input_censys == MASKED_PLACEHOLDER:
+            new_censys = os.getenv("CENSYS_API_TOKEN", "censys_EoyeoHTw_4Bqv968FBtRVrrQ9fZrJNisw")
+        else:
+            new_censys = input_censys
+
         new_timeout = data.get("scan_timeout", "2.5").strip()
 
         try:
@@ -263,7 +280,12 @@ def handle_config():
 def test_hec():
     data = request.json or {}
     raw_url = data.get("splunk_url") or os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
-    token = data.get("splunk_token") or os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
+    
+    input_token = data.get("splunk_token", "").strip()
+    if not input_token or "•" in input_token or "*" in input_token or input_token == MASKED_PLACEHOLDER:
+        token = os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
+    else:
+        token = input_token
 
     if not raw_url or not token:
         return jsonify({"success": False, "message": "Splunk URL and HEC Token are required."})
@@ -297,7 +319,7 @@ def test_hec():
         try:
             with urllib.request.urlopen(req, context=ctx, timeout=5) as response:
                 if response.status == 200:
-                    return jsonify({"success": True, "message": f"Splunk HEC connection successful! ({test_url})"})
+                    return jsonify({"success": True, "message": "Splunk HEC connection successful!"})
         except urllib.error.HTTPError as e:
             return jsonify({"success": False, "message": f"HTTP Error {e.code}: HEC rejected token."})
         except Exception as e:
