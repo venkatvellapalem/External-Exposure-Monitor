@@ -6,8 +6,37 @@ import ssl
 import yaml
 from pathlib import Path
 
-def test_splunk_hec(url, token):
-    print("\n[+] Testing connection to Splunk HEC...")
+def normalize_splunk_url(url: str) -> str:
+    url = url.strip()
+    if not url:
+        return ""
+    
+    # 1. Add scheme if missing (default to https since Splunk HEC defaults to SSL)
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = "https://" + url
+        
+    # 2. Add default port 8088 if no port is specified in the host portion
+    scheme, rest = url.split("//", 1)
+    host_path = rest.split("/", 1)
+    host_port = host_path[0]
+    path = host_path[1] if len(host_path) > 1 else ""
+    
+    if ":" not in host_port:
+        host_port = host_port + ":8088"
+        
+    url = f"{scheme}//{host_port}"
+    if path:
+        url = f"{url}/{path}"
+        
+    # 3. Add path "/services/collector/event" if collector is missing from path
+    if "services/collector" not in url:
+        if not url.endswith("/"):
+            url += "/"
+        url += "services/collector/event"
+        
+    return url
+
+def test_splunk_hec_direct(url, token):
     headers = {
         "Authorization": f"Splunk {token}",
         "Content-Type": "application/json"
@@ -26,17 +55,38 @@ def test_splunk_hec(url, token):
 
     try:
         with urllib.request.urlopen(req, context=ctx, timeout=5) as response:
-            res = json.loads(response.read().decode('utf-8'))
             if response.status == 200:
                 print("[-] Success! Splunk HEC responded successfully.")
                 return True
     except urllib.error.HTTPError as e:
         print(f"[!] HTTP Error {e.code}: HEC rejected the request. Check your Token.")
     except urllib.error.URLError as e:
-        print(f"[!] Network Error: Failed to reach Splunk HEC. Check your URL/IP. Reason: {e.reason}")
+        print(f"[!] Network Error: Failed to reach Splunk HEC. Reason: {e.reason}")
     except Exception as e:
-        print(f"[!] Unexpected error during test: {e}")
+        print(f"[!] Connection error: {e}")
     return False
+
+def test_splunk_hec(url, token):
+    print(f"\n[+] Testing connection to Splunk HEC at: {url}")
+    success = test_splunk_hec_direct(url, token)
+    if success:
+        return url, True
+        
+    if url.startswith("http://"):
+        fallback_url = url.replace("http://", "https://", 1)
+        print(f"[!] Connection failed using HTTP. Retrying with HTTPS: {fallback_url}...")
+        if test_splunk_hec_direct(fallback_url, token):
+            print("[+] HTTPS connection succeeded! Updating HEC URL to use HTTPS.")
+            return fallback_url, True
+            
+    elif url.startswith("https://"):
+        fallback_url = url.replace("https://", "http://", 1)
+        print(f"[!] Connection failed using HTTPS. Retrying with HTTP: {fallback_url}...")
+        if test_splunk_hec_direct(fallback_url, token):
+            print("[+] HTTP connection succeeded! Updating HEC URL to use HTTP.")
+            return fallback_url, True
+            
+    return url, False
 
 def main():
     print("=" * 50)
@@ -48,6 +98,7 @@ def main():
     current_url = ""
     current_token = ""
     current_timeout = "2.5"
+    current_censys_token = ""
     
     if env_path.exists():
         with env_path.open("r") as f:
@@ -58,6 +109,8 @@ def main():
                     current_token = line.split("=", 1)[1].strip()
                 elif line.startswith("SCAN_TIMEOUT="):
                     current_timeout = line.split("=", 1)[1].strip()
+                elif line.startswith("CENSYS_API_TOKEN="):
+                    current_censys_token = line.split("=", 1)[1].strip()
 
     # Clean Prompts for HEC configuration
     use_existing_hec = "n"
@@ -76,11 +129,28 @@ def main():
         url = input("Splunk HEC URL -> ").strip()
         token = input("Splunk HEC Token -> ").strip()
 
+    url = normalize_splunk_url(url)
+
     if not url or not token:
         print("[!] Splunk URL and HEC Token are required to run the collector.")
         return
 
+    # Prompt for Censys Passive Integration
+    print("\n--- Censys Passive Integration (Optional) ---")
+    use_existing_censys = "n"
+    if current_censys_token:
+        masked_secret = current_censys_token[:6] + "..." + current_censys_token[-6:] if len(current_censys_token) > 12 else "****"
+        print(f"Existing Censys Config Found:")
+        print(f"  Token: {masked_secret}")
+        use_existing_censys = input("Use existing Censys token? (y/n) -> ").strip().lower() or "y"
+
+    if use_existing_censys == "y":
+        censys_token = current_censys_token
+    else:
+        censys_token = input("Censys Personal Access Token (Press Enter to skip) -> ").strip()
+
     # Prompt for SCAN_TIMEOUT
+    print("\n--- Scanner Connection Settings ---")
     timeout_str = input(f"Connection Scan Timeout (seconds) [{current_timeout}] -> ").strip() or current_timeout
     try:
         float(timeout_str)
@@ -88,15 +158,16 @@ def main():
         timeout_str = "2.5"
 
     # Test connection
-    test_conn = input("Test HEC connection now? (y/n) -> ").strip().lower() or "y"
+    test_conn = input("\nTest Splunk HEC connection now? (y/n) -> ").strip().lower() or "y"
     if test_conn == "y":
-        test_splunk_hec(url, token)
+        url, success = test_splunk_hec(url, token)
 
     # Write .env
     with env_path.open("w") as f:
         f.write(f"SPLUNK_URL={url}\n")
         f.write(f"SPLUNK_HEC_TOKEN={token}\n")
         f.write(f"SCAN_TIMEOUT={timeout_str}\n")
+        f.write(f"CENSYS_API_TOKEN={censys_token}\n")
     print("[-] Config parameters saved to .env")
 
     # 2. Configure Assets
@@ -139,8 +210,14 @@ def main():
             while not value:
                 value = input(f"Enter {t_type} target value -> ").strip()
                 
-            new_assets.append({"type": t_type, "value": value})
-            print(f"[-] Added {t_type}: {value}")
+            asset_entry = {"type": t_type, "value": value}
+            if t_type == "ip":
+                domain_val = input("Associated Domain Name (Press Enter if none) -> ").strip()
+                if domain_val:
+                    asset_entry["domain"] = domain_val
+
+            new_assets.append(asset_entry)
+            print(f"[-] Added {t_type}: {value}" + (f" (Domain: {asset_entry['domain']})" if asset_entry.get("domain") else ""))
             
             another = input("Would you like to add another asset? (y/n) -> ").strip().lower()
             if another != "y":

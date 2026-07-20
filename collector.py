@@ -7,6 +7,7 @@ load_dotenv()
 from core.splunk_client import SplunkClient
 from core.logger import get_logger
 from core.shodan_client import InternetDBClient
+from core.censys_client import CensysClient
 from core.normalizer import normalize_internetdb_response
 from core.risk_engine import calculate_risk
 from core.baseline import BaselineEngine
@@ -30,6 +31,17 @@ def resolve_to_ip(value: str) -> str:
         except Exception as e:
             logger.error(f"[!] Failed to resolve {value}: {e}")
             return None
+
+def resolve_reverse_dns(ip: str) -> list:
+    old_timeout = socket.getdefaulttimeout()
+    try:
+        socket.setdefaulttimeout(2.0)
+        hostname, _, _ = socket.gethostbyaddr(ip)
+        return [hostname] if hostname else []
+    except Exception:
+        return []
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
 def get_target_ips():
     """Yields unique individual tuples of (ip, domain/hostname) from the configured assets."""
@@ -65,7 +77,7 @@ def get_target_ips():
             resolved_ip = resolve_to_ip(val)
             if resolved_ip and resolved_ip not in scanned_ips:
                 scanned_ips.add(resolved_ip)
-                domain_val = val if resolved_ip != val else ""
+                domain_val = asset.get("domain", "") or (val if resolved_ip != val else "")
                 yield resolved_ip, domain_val
 
 def main():
@@ -79,6 +91,7 @@ def main():
 
     baseline = BaselineEngine()
     shodan = InternetDBClient()
+    censys = CensysClient()
     active = ActiveScanner()
     
     new_exposures = 0
@@ -92,14 +105,30 @@ def main():
         scanned_ips_this_run.add(ip)
         logger.info(f"Scanning {ip} (Asset Domain: {domain if domain else 'None'})...")
         
+        # 1. Query Shodan passive database
         info = shodan.get_ip_info(ip)
         events = normalize_internetdb_response(info)
         
-        # Fallback: If Shodan has no data, actively verify common industry ports in parallel
+        # 2. Query Censys passive database (Optional integration)
+        censys_events = censys.get_exposures(ip)
+        
+        # Merge exposures, avoiding duplicates on the same port
+        seen_ports = {e.port for e in events}
+        for ce in censys_events:
+            if ce.port not in seen_ports:
+                events.append(ce)
+                seen_ports.add(ce.port)
+        
+        # 3. Active fallback scanning: If both passive engines returned nothing
         if not events:
-            logger.info(f"[-] No Shodan data for {ip}. Running parallel fallback port scan...")
-            fallback_ports = [80, 443, 8080, 8443, 21, 22, 23]
-            open_ports = active.scan_ports_parallel(ip, fallback_ports)
+            # Check if high-speed RustScan is installed on system
+            if active.is_rustscan_available():
+                open_ports = active.run_rustscan(ip)
+            else:
+                logger.info(f"[-] No passive records. Running native parallel fallback port scan...")
+                fallback_ports = [80, 443, 8080, 8443, 21, 22, 23]
+                open_ports = active.scan_ports_parallel(ip, fallback_ports)
+                
             for port in open_ports:
                 events.append(
                     ExposureEvent(
@@ -113,12 +142,17 @@ def main():
                     )
                 )
         
-        # Process exposures
+        # 4. Process exposures
         for event in events:
             event.domain = domain
             
-            # Check active status (skip if Shodan-reported port is actually closed)
-            if event.source == "internetdb" and not active.is_port_open(event.ip, event.port):
+            # If hostnames is empty, attempt reverse DNS resolution safely without mutating global socket timeout
+            if not event.hostnames:
+                event.hostnames = resolve_reverse_dns(event.ip)
+            
+            # Check active status (skip if reported port is actually closed)
+            # Skip checking active_fallback events since we literally just verified them open
+            if event.source != "active_fallback" and not active.is_port_open(event.ip, event.port):
                 logger.info(f"Skipping closed exposure: {event.ip}:{event.port}")
                 continue
 
@@ -129,7 +163,6 @@ def main():
             # Check state changes in baseline
             last_status = baseline.get_status(event.ip, event.port)
             if last_status != "open":
-                # Newly opened or re-opened!
                 new_exposures += 1
                 event.status = "open"
                 baseline.update_status(event.ip, event.port, "open")
@@ -153,19 +186,16 @@ def main():
                 if not result.get("success"):
                     logger.error(f"Failed to send to Splunk: {result.get('error')}")
 
-    # 4. Active Reconciliation: Detect resolved (closed) exposures on scanned IPs
+    # 5. Active Reconciliation: Detect resolved (closed) exposures on scanned IPs
     currently_open_in_baseline = baseline.get_currently_open()
     for exp_id in currently_open_in_baseline:
         ip, port_str = exp_id.split(":")
         port = int(port_str)
         
-        # We only declare an exposure closed if we actively scanned the parent IP,
-        # but the specific port was no longer found open.
         if ip in scanned_ips_this_run and exp_id not in active_exposures_this_run:
             resolved_exposures_count += 1
             baseline.update_status(ip, port, "closed")
             
-            # Send status='closed' event to Splunk
             resolved_event = ExposureEvent(
                 ip=ip,
                 port=port,

@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import urllib.request
 import urllib.error
 import ssl
@@ -19,8 +20,8 @@ class SplunkClient:
         if not self.token:
             raise ValueError("SPLUNK_HEC_TOKEN is not configured.")
 
-    def send_event(self, event: dict) -> dict:
-        """Sends a single event to Splunk HEC."""
+    def send_event(self, event: dict, max_retries: int = 3) -> dict:
+        """Sends a single event to Splunk HEC with automatic retries."""
         
         headers = {
             "Authorization": f"Splunk {self.token}",
@@ -34,43 +35,42 @@ class SplunkClient:
             "event": event
         }
         payload = json.dumps(payload_dict).encode('utf-8')
-        req = urllib.request.Request(self.url, data=payload, headers=headers, method='POST')
         
-        # ponytail: ignoring SSL validation by default for local self-signed certs. Upgrade path: add SPLUNK_CA_CERT to env and pass cafile to create_default_context.
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
 
-        try:
-            with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
+        last_error = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                req = urllib.request.Request(self.url, data=payload, headers=headers, method='POST')
+                with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
+                    return {
+                        "success": True,
+                        "status_code": response.status,
+                        "message": "Event sent successfully.",
+                        "data": json.loads(response.read().decode('utf-8')),
+                        "error": None
+                    }
+            except urllib.error.HTTPError as e:
+                # HTTP rejection (401, 403, 400) won't succeed on retry
                 return {
-                    "success": True,
-                    "status_code": response.status,
-                    "message": "Event sent successfully.",
-                    "data": json.loads(response.read().decode('utf-8')),
-                    "error": None
+                    "success": False,
+                    "status_code": e.code,
+                    "message": "HTTP request failed.",
+                    "data": None,
+                    "error": str(e)
                 }
-        except urllib.error.HTTPError as e:
-            return {
-                "success": False,
-                "status_code": e.code,
-                "message": "HTTP request failed.",
-                "data": None,
-                "error": str(e)
-            }
-        except urllib.error.URLError as e:
-            return {
-                "success": False,
-                "status_code": None,
-                "message": "Failed to reach Splunk HEC.",
-                "data": None,
-                "error": str(e.reason)
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "status_code": None,
-                "message": "Unexpected error.",
-                "data": None,
-                "error": str(e)
-            }
+            except (urllib.error.URLError, Exception) as e:
+                last_error = str(e.reason) if hasattr(e, 'reason') else str(e)
+                if attempt < max_retries:
+                    time.sleep(1)
+                    continue
+
+        return {
+            "success": False,
+            "status_code": None,
+            "message": f"Failed to reach Splunk HEC after {max_retries} attempts.",
+            "data": None,
+            "error": last_error
+        }

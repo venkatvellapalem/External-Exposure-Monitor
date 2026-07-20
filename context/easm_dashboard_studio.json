@@ -18,7 +18,16 @@
                     {"value": "#f8be34", "match": [10, 50]},
                     {"value": "#dc4e41", "match": [50, 1000]}
                 ]
-            }
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.customUrl",
+                    "options": {
+                        "url": "/app/search/search?q=search%20index%3D*%20source%3Deasm_collector%20%7C%20dedup%20ip%20port%20%7C%20search%20status%3D%22open%22%20%7C%20eval%20domain%20%3D%20coalesce(nullif(domain%2C%20%22%22)%2C%20%22N%2FA%22)%20%7C%20eval%20hostname%20%3D%20coalesce(mvindex('hostnames%7B%7D'%2C%200)%2C%20%22N%2FA%22)%20%7C%20table%20_time%2C%20ip%2C%20domain%2C%20hostname%2C%20port%2C%20risk%2C%20status&earliest=$global_time.earliest$&latest=$global_time.latest$",
+                        "newTab": true
+                    }
+                }
+            ]
         },
         "viz_critical_exposures": {
             "type": "splunk.singlevalue",
@@ -28,7 +37,16 @@
             "title": "Critical / High Threat Alerts",
             "options": {
                 "majorColor": "#dc4e41"
-            }
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.customUrl",
+                    "options": {
+                        "url": "/app/search/search?q=search%20index%3D*%20source%3Deasm_collector%20(risk%3D%22Critical%22%20OR%20risk%3D%22High%22)%20%7C%20dedup%20ip%20port%20%7C%20search%20status%3D%22open%22%20%7C%20eval%20domain%20%3D%20coalesce(nullif(domain%2C%20%22%22)%2C%20%22N%2FA%22)%20%7C%20eval%20hostname%20%3D%20coalesce(mvindex('hostnames%7B%7D'%2C%200)%2C%20%22N%2FA%22)%20%7C%20table%20_time%2C%20ip%2C%20domain%2C%20hostname%2C%20port%2C%20risk%2C%20status%2C%20leaks%2C%20vulns%7B%7D&earliest=$global_time.earliest$&latest=$global_time.latest$",
+                        "newTab": true
+                    }
+                }
+            ]
         },
         "viz_ingest_rate": {
             "type": "splunk.line",
@@ -44,15 +62,47 @@
             },
             "title": "Attack Surface Risk Severity",
             "options": {
-                "seriesColors": ["#53a051", "#f8be34", "#f1813f", "#dc4e41"]
-            }
+                "seriesColorsByField": {
+                    "Low": "#53a051",
+                    "Medium": "#f8be34",
+                    "High": "#f1813f",
+                    "Critical": "#dc4e41"
+                }
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.customUrl",
+                    "options": {
+                        "url": "/app/search/search?q=search%20index%3D*%20source%3Deasm_collector%20risk%3D%22$row.risk.value$%22%20%7C%20dedup%20ip%20port%20%7C%20search%20status%3D%22open%22%20%7C%20eval%20domain%20%3D%20coalesce(nullif(domain%2C%20%22%22)%2C%20%22N%2FA%22)%20%7C%20eval%20hostname%20%3D%20coalesce(mvindex('hostnames%7B%7D'%2C%200)%2C%20%22N%2FA%22)%20%7C%20table%20_time%2C%20ip%2C%20domain%2C%20hostname%2C%20port%2C%20risk%2C%20status&earliest=$global_time.earliest$&latest=$global_time.latest$",
+                        "newTab": true
+                    }
+                }
+            ]
         },
         "viz_top_ports": {
             "type": "splunk.bar",
             "dataSources": {
                 "primary": "ds_top_ports"
             },
-            "title": "Exposed Ports Distribution"
+            "title": "Exposed Ports Distribution by Risk",
+            "options": {
+                "stackMode": "stacked",
+                "seriesColorsByField": {
+                    "Low": "#53a051",
+                    "Medium": "#f8be34",
+                    "High": "#f1813f",
+                    "Critical": "#dc4e41"
+                }
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.customUrl",
+                    "options": {
+                        "url": "/app/search/search?q=search%20index%3D*%20source%3Deasm_collector%20port%3D$row.port.value$%20%7C%20dedup%20ip%20port%20%7C%20search%20status%3D%22open%22%20%7C%20eval%20domain%20%3D%20coalesce(nullif(domain%2C%20%22%22)%2C%20%22N%2FA%22)%20%7C%20eval%20hostname%20%3D%20coalesce(mvindex('hostnames%7B%7D'%2C%200)%2C%20%22N%2FA%22)%20%7C%20table%20_time%2C%20ip%2C%20domain%2C%20hostname%2C%20port%2C%20risk%2C%20status&earliest=$global_time.earliest$&latest=$global_time.latest$",
+                        "newTab": true
+                    }
+                }
+            ]
         },
         "viz_map": {
             "type": "splunk.map",
@@ -70,7 +120,16 @@
             "dataSources": {
                 "primary": "ds_recent_exposures"
             },
-            "title": "Live EASM Alert Feed (Real-Time Splunk Ingestion)"
+            "title": "Live EASM Alert Feed (Real-Time Splunk Ingestion)",
+            "eventHandlers": [
+                {
+                    "type": "drilldown.customUrl",
+                    "options": {
+                        "url": "/app/search/search?q=search%20index%3D*%20source%3Deasm_collector%20ip%3D%22$row.ip.value$%22%20port%3D$row.port.value$",
+                        "newTab": true
+                    }
+                }
+            ]
         }
     },
     "dataSources": {
@@ -101,7 +160,7 @@
         "ds_top_ports": {
             "type": "ds.search",
             "options": {
-                "query": "index=* source=easm_collector | dedup ip port | search status=\"open\" | top limit=10 port"
+                "query": "index=* source=easm_collector | dedup ip port | search status=\"open\" | chart count by port, risk"
             }
         },
         "ds_map": {
@@ -113,7 +172,7 @@
         "ds_recent_exposures": {
             "type": "ds.search",
             "options": {
-                "query": "index=* source=easm_collector | table _time, ip, port, \"hostnames{}\", risk, status | sort - _time"
+                "query": "index=* source=easm_collector | eval domain = coalesce(nullif(domain, \"\"), \"N/A\") | eval hostname = coalesce(mvindex('hostnames{}', 0), \"N/A\") | table _time, ip, domain, hostname, port, risk, status | sort - _time"
             }
         }
     },

@@ -1,4 +1,4 @@
-organization: College Network
+organization: Sample Enterprise
 assets:
-  - type: ip
-    value: 117.250.201.144
+  - type: domain
+    value: testaspnet.vulnweb.com

@@ -3,6 +3,9 @@ import socket
 import urllib.request
 import urllib.error
 import ssl
+import shutil
+import subprocess
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from core.logger import get_logger
 
@@ -15,6 +18,44 @@ class ActiveScanner:
         # Load configurable scan timeout from environment, default to 2.5s to prevent false negatives
         self.timeout = float(os.getenv("SCAN_TIMEOUT", 2.5))
         logger.info(f"[-] ActiveScanner initialized with timeout={self.timeout}s")
+
+    def is_rustscan_available(self) -> bool:
+        """Returns True if rustscan binary is installed in the system PATH."""
+        return shutil.which("rustscan") is not None
+
+    def run_rustscan(self, ip: str) -> list:
+        """Runs RustScan to scan all 65,535 ports in parallel.
+        
+        Parses output in grepable format: e.g. '1.1.1.1 -> [53, 80, 443]'
+        """
+        if not self.is_rustscan_available():
+            return []
+            
+        logger.warn(f"[-] RustScan detected! Initiating high-speed 65,535 port scan on {ip}...")
+        cmd = ["rustscan", "-a", ip, "-t", "2000", "--ulimit", "5000", "-g"]
+        
+        try:
+            # Execute RustScan with a 20 second safety timeout
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+            if result.returncode == 0:
+                output = result.stdout.strip()
+                # Extract ports from e.g. "44.238.29.244 -> [80, 443]"
+                match = re.search(r"->\s*\[(.*?)\]", output)
+                if match:
+                    ports_str = match.group(1)
+                    if ports_str.strip():
+                        ports = [int(p.strip()) for p in ports_str.split(",") if p.strip().isdigit()]
+                        logger.info(f"[+] RustScan discovered {len(ports)} open TCP ports on {ip}: {ports}")
+                        return ports
+                logger.info(f"[-] RustScan completed. No open ports found on {ip}.")
+            else:
+                logger.error(f"[!] RustScan process failed (exit {result.returncode}): {result.stderr}")
+        except subprocess.TimeoutExpired:
+            logger.error(f"[!] RustScan execution timed out for {ip}")
+        except Exception as e:
+            logger.error(f"[!] Failed to run RustScan wrapper: {e}")
+            
+        return []
 
     def is_port_open(self, ip: str, port: int, timeout: float = None) -> bool:
         """Verifies if a port is actually open using a direct TCP connection."""
@@ -47,8 +88,8 @@ class ActiveScanner:
         t = timeout if timeout is not None else self.timeout
         protocol = "https" if port in {443, 8443, 2083, 2087} else "http"
         
-        # Use domain name if available to solve shared hosting (IIS/Apache/Nginx Virtual Hosts) routing
-        target_host = domain if domain else ip
+        # Use domain name only if it is a valid FQDN (no spaces), otherwise fall back to IP
+        target_host = domain.strip() if domain and " " not in domain.strip() else ip
         base_url = f"{protocol}://{target_host}:{port}"
         discovered_leaks = []
         
