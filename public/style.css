@@ -1079,11 +1079,28 @@ body {
     display: none !important;
 }
 
-/* Nav Left & Hamburger Button */
+/* Nav Left, Right Group & Hamburger Button */
 .nav-left {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-shrink: 0;
+}
+
+.nav-right-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .hamburger-btn {
@@ -1111,7 +1128,9 @@ body {
 /* User Profile Pill & Dropdown Menu */
 .profile-dropdown-container {
     position: relative;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
 }
 
 .profile-pill-btn {

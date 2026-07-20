@@ -36,48 +36,49 @@
                 </div>
             </div>
 
-            <!-- Center: Essential Links Only -->
-            <nav class="nav-menu">
-                <button class="nav-link active" data-tab="tab-dashboard">Dashboard</button>
-                <button class="nav-link" data-tab="tab-assets">Asset Inventory</button>
-                <button class="nav-link" data-tab="tab-splunk">Splunk SOC Hub</button>
-            </nav>
+            <!-- Right Side Alignment Group (Nav Links + Profile + GitHub) -->
+            <div class="nav-right-group">
+                <nav class="nav-menu">
+                    <button class="nav-link active" data-tab="tab-dashboard">Dashboard</button>
+                    <button class="nav-link" data-tab="tab-assets">Asset Inventory</button>
+                    <button class="nav-link" data-tab="tab-splunk">Splunk SOC Hub</button>
+                </nav>
 
-            <!-- Right: Embedded Profile Dropdown & GitHub Link -->
-            <div class="nav-actions">
-                <div id="user-badge-container" class="profile-dropdown-container" style="display:none;">
-                    <button id="btn-profile-dropdown" class="profile-pill-btn">
-                        <span id="user-display-name" class="user-name-tag">admin (ROOT ADMIN)</span>
-                        <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                    </button>
-                    <div id="profile-dropdown-menu" class="profile-dropdown-menu hidden">
-                        <div class="dropdown-header">
-                            <div id="dropdown-user-name" class="dropdown-username">admin</div>
-                            <div id="dropdown-user-role" class="dropdown-role-badge">ROOT ADMIN</div>
+                <div class="nav-actions">
+                    <div id="user-badge-container" class="profile-dropdown-container" style="display:none;">
+                        <button id="btn-profile-dropdown" class="profile-pill-btn">
+                            <span id="user-display-name" class="user-name-tag">admin (ROOT ADMIN)</span>
+                            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div id="profile-dropdown-menu" class="profile-dropdown-menu hidden">
+                            <div class="dropdown-header">
+                                <div id="dropdown-user-name" class="dropdown-username">admin</div>
+                                <div id="dropdown-user-role" class="dropdown-role-badge">ROOT ADMIN</div>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item" id="dropdown-item-iam" onclick="switchTab('tab-iam'); closeProfileDropdown();">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                IAM Users
+                            </button>
+                            <button class="dropdown-item" onclick="switchTab('tab-config'); closeProfileDropdown();">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                Settings
+                            </button>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item danger" id="btn-user-logout">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                                Logout
+                            </button>
                         </div>
-                        <div class="dropdown-divider"></div>
-                        <button class="dropdown-item" id="dropdown-item-iam" onclick="switchTab('tab-iam'); closeProfileDropdown();">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                            IAM Users
-                        </button>
-                        <button class="dropdown-item" onclick="switchTab('tab-config'); closeProfileDropdown();">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                            Settings
-                        </button>
-                        <div class="dropdown-divider"></div>
-                        <button class="dropdown-item danger" id="btn-user-logout">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                            Logout
-                        </button>
                     </div>
+                    <a href="https://github.com/venkatvellapalem/External-Exposure-Monitor" target="_blank" class="nav-btn-icon" title="View Source on GitHub">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+                        </svg>
+                    </a>
                 </div>
-                <a href="https://github.com/venkatvellapalem/External-Exposure-Monitor" target="_blank" class="nav-btn-icon" title="View Source on GitHub">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
-                    </svg>
-                </a>
             </div>
         </div>
     </header>
