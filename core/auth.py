@@ -245,22 +245,40 @@ class AuthManager:
         return totp.verify(code.strip(), valid_window=1)
 
     @staticmethod
-    def create_jwt(username: str, role: str, mfa_verified: bool = False, hours: int = 12) -> str:
-        """Creates a signed JWT session token."""
-        exp = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=hours)
+    def create_jwt(username: str, role: str, mfa_verified: bool = False, hours: int = 1) -> str:
+        """Creates a signed JWT session token enforcing a 1-hour absolute lifetime and tracking last_active timestamp."""
+        now = datetime.datetime.now(datetime.timezone.utc)
+        exp = now + datetime.timedelta(hours=hours)
+        now_ts = int(now.timestamp())
         payload = {
             "username": username,
             "role": role,
             "mfa_verified": mfa_verified,
+            "iat": now_ts,
+            "last_active": now_ts,
             "exp": exp
         }
         return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
     @staticmethod
     def verify_jwt(token: str) -> dict:
-        """Verifies JWT token signature and expiration."""
+        """Verifies JWT token signature, 1-hour absolute limit, and 30-minute sliding idle inactivity limit."""
         try:
             payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            now_ts = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+
+            # 1 Hour Absolute Limit (3600 seconds)
+            iat = payload.get("iat")
+            if iat and (now_ts - iat > 3600):
+                logger.warning(f"[!] JWT Expired: 1 hour absolute limit reached for {payload.get('username')}")
+                return None
+
+            # 30 Minutes Sliding Inactivity Limit (1800 seconds)
+            last_active = payload.get("last_active")
+            if last_active and (now_ts - last_active > 1800):
+                logger.warning(f"[!] JWT Expired: 30 minutes inactivity limit reached for {payload.get('username')}")
+                return None
+
             return payload
         except Exception:
             return None
@@ -282,25 +300,29 @@ class AuthManager:
             })
         return result
 
-    def create_user(self, username: str, role: str = "soc_analyst") -> tuple[bool, str, str]:
-        """Creates a new user account with temporary password 'TempPass@2026Secure!' requiring password reset."""
+    def create_user(self, username: str, role: str = "soc_analyst", password: str = None) -> tuple[bool, str]:
+        """Creates a new user account with specified initial password after validating 16+ char complexity."""
         users = self._load_users()
         if username in users:
-            return False, "Username already exists.", ""
+            return False, "Username already exists."
 
-        temp_pass = "TempPass@2026Secure!"
+        initial_pass = password if password else "TempPass@2026Secure!"
+        valid, msg = self.validate_password_complexity(initial_pass)
+        if not valid:
+            return False, msg
+
         users[username] = {
             "username": username,
-            "password_hash": self.hash_password(temp_pass),
+            "password_hash": self.hash_password(initial_pass),
             "role": role,
-            "must_change_password": True,
+            "must_change_password": False if password else True,
             "mfa_enabled": False,
             "mfa_secret": "",
             "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
         self._save_users(users)
         logger.info(f"[+] Created user account '{username}' with role '{role}'")
-        return True, f"User {username} created successfully.", temp_pass
+        return True, f"User '{username}' created successfully."
 
     def delete_user(self, username: str) -> tuple[bool, str]:
         if username == "admin":

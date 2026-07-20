@@ -713,18 +713,34 @@ def handle_iam_users():
         data = request.json or {}
         username = data.get("username", "").strip().lower()
         role = data.get("role", "soc_analyst").strip().lower()
+        password = data.get("password", "")
+        confirm_password = data.get("confirm_password", "")
+        admin_password = data.get("admin_password", "")
 
         if not username:
-            return jsonify({"success": False, "message": "Username required."}), 400
+            return jsonify({"success": False, "message": "Username is required."}), 400
 
-        success, msg, temp_pass = auth_manager.create_user(username, role)
+        if not password or not confirm_password:
+            return jsonify({"success": False, "message": "Initial password and confirmation password are required."}), 400
+
+        if password != confirm_password:
+            return jsonify({"success": False, "message": "Initial passwords do not match."}), 400
+
+        if not admin_password:
+            return jsonify({"success": False, "message": "Admin authorization password is required to create a user."}), 400
+
+        admin_username = current_user.get("username")
+        admin_user = auth_manager.get_user(admin_username)
+        if not admin_user or not auth_manager.verify_password(admin_password, admin_user.get("password_hash", "")):
+            return jsonify({"success": False, "message": "Invalid admin authorization password. User creation denied."}), 401
+
+        success, msg = auth_manager.create_user(username, role, password)
         if not success:
             return jsonify({"success": False, "message": msg}), 400
 
         return jsonify({
             "success": True,
-            "message": f"User '{username}' created cleanly. Temporary password: '{temp_pass}'",
-            "temporary_password": temp_pass
+            "message": f"User '{username}' created successfully with role '{role.replace('_', ' ').title()}'."
         })
 
     elif request.method == 'DELETE':

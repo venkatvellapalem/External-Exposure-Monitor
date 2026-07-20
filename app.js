@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initPasswordToggles();
     initHamburgerDrawer();
     initProfileDropdown();
+    initInactivityTracker();
 
     checkAuthSession();
     loadStatus();
@@ -21,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('form-config')?.addEventListener('submit', saveConfig);
     document.getElementById('form-create-user')?.addEventListener('submit', createIamUser);
     document.getElementById('btn-test-hec')?.addEventListener('click', testHec);
-    document.getElementById('btn-user-logout')?.addEventListener('click', handleLogout);
+    document.getElementById('btn-user-logout')?.addEventListener('click', () => handleLogout());
     document.getElementById('btn-clear-log')?.addEventListener('click', () => {
         document.getElementById('scan-log-output').textContent = '=== EASM Collector Console Output ===\nWaiting for scan trigger...';
     });
@@ -32,6 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
 let currentUser = null;
 let pendingAuthUser = null;
 let pendingMfaSecret = null;
+
+let lastUserActivity = Date.now();
+let sessionStartTime = Date.now();
 
 const TAB_SLUG_MAP = {
     'tab-dashboard': 'dashboard',
@@ -54,6 +58,35 @@ const SLUG_TAB_MAP = {
     'config': 'tab-config',
     'iam': 'tab-iam'
 };
+
+function initInactivityTracker() {
+    const resetTimer = () => {
+        lastUserActivity = Date.now();
+    };
+
+    window.addEventListener('mousemove', resetTimer, { passive: true });
+    window.addEventListener('keydown', resetTimer, { passive: true });
+    window.addEventListener('click', resetTimer, { passive: true });
+    window.addEventListener('scroll', resetTimer, { passive: true });
+    window.addEventListener('touchstart', resetTimer, { passive: true });
+
+    setInterval(() => {
+        if (!currentUser) return;
+
+        const now = Date.now();
+        // 30 Minutes Inactivity Logout (30 * 60 * 1000 = 1,800,000 ms)
+        if (now - lastUserActivity > 30 * 60 * 1000) {
+            handleLogout("Logged out due to 30 minutes of inactivity.");
+            return;
+        }
+
+        // 1 Hour Absolute Session Lifetime Limit (60 * 60 * 1000 = 3,600,000 ms)
+        if (now - sessionStartTime > 60 * 60 * 1000) {
+            handleLogout("Maximum 1 hour session lifetime reached. Please sign in again.");
+            return;
+        }
+    }, 10000);
+}
 
 function initNavigation() {
     const navLinks = document.querySelectorAll('.nav-link');
@@ -113,6 +146,8 @@ async function checkAuthSession() {
         const data = await res.json();
         if (data.authenticated) {
             currentUser = data;
+            sessionStartTime = Date.now();
+            lastUserActivity = Date.now();
             hideAuthModal();
             showUserBadge(data.username, data.role);
             applyRbacUI(data.role);
@@ -353,6 +388,9 @@ function initAuthFlow() {
             const data = await res.json();
             if (data.success) {
                 currentUser = data.user;
+                sessionStartTime = Date.now();
+                lastUserActivity = Date.now();
+
                 if (data.user.must_change_password) {
                     showAuthModal('password');
                 } else {
@@ -406,17 +444,16 @@ function initAuthFlow() {
     });
 }
 
-async function handleLogout() {
+async function handleLogout(reasonMsg) {
     try {
         await fetch('/api/auth/logout', { method: 'POST' });
-        currentUser = null;
-        document.getElementById('user-badge-container').style.display = 'none';
-        closeProfileDropdown();
-        showToast("Logged out.");
-        showAuthModal('login');
-    } catch (e) {
-        location.reload();
-    }
+    } catch (e) {}
+    currentUser = null;
+    const badge = document.getElementById('user-badge-container');
+    if (badge) badge.style.display = 'none';
+    closeProfileDropdown();
+    showToast(reasonMsg ? reasonMsg : "Logged out.");
+    showAuthModal('login');
 }
 
 async function loadIamUsers() {
@@ -452,17 +489,34 @@ async function createIamUser(e) {
     e.preventDefault();
     const username = document.getElementById('iam-new-username').value.trim();
     const role = document.getElementById('iam-new-role').value;
+    const password = document.getElementById('iam-new-password').value;
+    const confirmPassword = document.getElementById('iam-confirm-password').value;
+    const adminPassword = document.getElementById('iam-admin-password').value;
+
+    if (password !== confirmPassword) {
+        showToast("New user initial passwords do not match.");
+        return;
+    }
 
     try {
         const res = await fetch('/api/iam/users', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ username, role })
+            body: JSON.stringify({
+                username: username,
+                role: role,
+                password: password,
+                confirm_password: confirmPassword,
+                admin_password: adminPassword
+            })
         });
         const data = await res.json();
         if (data.success) {
             showToast(data.message);
             document.getElementById('iam-new-username').value = '';
+            document.getElementById('iam-new-password').value = '';
+            document.getElementById('iam-confirm-password').value = '';
+            document.getElementById('iam-admin-password').value = '';
             loadIamUsers();
         } else {
             showToast("Failed: " + data.message);

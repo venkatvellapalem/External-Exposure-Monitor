@@ -506,6 +506,49 @@ Waiting for scan trigger...</pre>
                             </select>
                         </div>
                     </div>
+
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>New User Initial Password (16+ Chars)</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="iam-new-password" class="form-input" placeholder="" required autocomplete="new-password">
+                                <button type="button" class="btn-toggle-pass" data-target="iam-new-password" title="Toggle Password Visibility">
+                                    <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group half">
+                            <label>Confirm Initial Password</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="iam-confirm-password" class="form-input" placeholder="" required autocomplete="new-password">
+                                <button type="button" class="btn-toggle-pass" data-target="iam-confirm-password" title="Toggle Password Visibility">
+                                    <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group full">
+                            <label>Current Admin Password (Required to Authorize Creation)</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="iam-admin-password" class="form-input" placeholder="" required autocomplete="current-password">
+                                <button type="button" class="btn-toggle-pass" data-target="iam-admin-password" title="Toggle Password Visibility">
+                                    <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-actions">
                         <button type="submit" class="pill-btn primary">Create IAM Account</button>
                     </div>
