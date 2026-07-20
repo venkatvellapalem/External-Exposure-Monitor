@@ -510,20 +510,31 @@ def test_hec():
 
 @app.route('/api/assets', methods=['GET', 'POST', 'DELETE'])
 def handle_assets():
+    current_user = get_current_user_from_request()
+    if not current_user:
+        return jsonify({"authenticated": False, "message": "Authentication required."}), 401
+
     assets_path = get_assets_path()
+    deleted_cookie = request.cookies.get("easm_deleted_assets", "")
+    deleted_set = set(x.strip() for x in deleted_cookie.split(",") if x.strip())
     
     if request.method == 'GET':
-        if not assets_path.exists():
-            return jsonify({"organization": "MITS", "assets": []})
-        try:
-            with assets_path.open("r", encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
-                return jsonify({
-                    "organization": data.get("organization", "MITS"),
-                    "assets": data.get("assets", [])
-                })
-        except Exception as e:
-            return jsonify({"organization": "MITS", "assets": [], "error": str(e)})
+        raw_assets = []
+        org_name = "MITS"
+        if assets_path.exists():
+            try:
+                with assets_path.open("r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+                    org_name = data.get("organization", "MITS")
+                    raw_assets = data.get("assets", []) or []
+            except Exception:
+                pass
+        
+        filtered_assets = [a for a in raw_assets if a.get("value") not in deleted_set]
+        return jsonify({
+            "organization": org_name,
+            "assets": filtered_assets
+        })
 
     elif request.method == 'POST':
         body = request.json or {}
@@ -557,41 +568,37 @@ def handle_assets():
         except (OSError, PermissionError):
             pass
 
-        return jsonify({"success": True, "message": f"Added {t_type}: {val}"})
+        # Remove val from deleted cookie list if present
+        deleted_set.discard(val)
+        resp = make_response(jsonify({"success": True, "message": f"Added {t_type}: {val}"}))
+        resp.set_cookie("easm_deleted_assets", ",".join(deleted_set), max_age=365 * 24 * 3600, samesite="Lax")
+        return resp
 
     elif request.method == 'DELETE':
         body = request.json or {}
         val_to_delete = body.get("value", "").strip()
 
-        if not assets_path.exists():
-            return jsonify({"success": False, "message": "No assets file found."})
+        if not val_to_delete:
+            return jsonify({"success": False, "message": "Target value required for deletion."})
 
-        try:
-            with assets_path.open("r", encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
-            
-            assets = data.get("assets", [])
-            data["assets"] = [a for a in assets if a.get("value") != val_to_delete]
-            
-            writable_assets = get_writable_file("config/assets.yaml")
-            with writable_assets.open("w", encoding="utf-8") as f:
-                yaml.dump(data, f, default_flow_style=False)
+        if assets_path.exists():
+            try:
+                with assets_path.open("r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+                
+                assets = data.get("assets", [])
+                data["assets"] = [a for a in assets if a.get("value") != val_to_delete]
+                
+                writable_assets = get_writable_file("config/assets.yaml")
+                with writable_assets.open("w", encoding="utf-8") as f:
+                    yaml.dump(data, f, default_flow_style=False)
+            except Exception:
+                pass
 
-            # Instantly remove exposure entries matching this target IP/domain from baseline.json
-            writable_baseline = get_writable_file("data/baseline.json")
-            if writable_baseline.exists():
-                try:
-                    with writable_baseline.open("r", encoding="utf-8") as f:
-                        b_data = json.load(f)
-                    b_data = {k: v for k, v in b_data.items() if not k.startswith(f"{val_to_delete}:")}
-                    with writable_baseline.open("w", encoding="utf-8") as f:
-                        json.dump(b_data, f, indent=4)
-                except Exception:
-                    pass
-
-            return jsonify({"success": True, "message": f"Removed asset: {val_to_delete}"})
-        except Exception as e:
-            return jsonify({"success": False, "message": str(e)})
+        deleted_set.add(val_to_delete)
+        resp = make_response(jsonify({"success": True, "message": f"Removed asset target: {val_to_delete}"}))
+        resp.set_cookie("easm_deleted_assets", ",".join(deleted_set), max_age=365 * 24 * 3600, samesite="Lax")
+        return resp
 
 @app.route('/api/assets/reset', methods=['POST'])
 def reset_assets():

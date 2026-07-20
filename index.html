@@ -295,15 +295,44 @@
             <!-- Toast Notification Container -->
             <div id="toast-container" class="toast-container"></div>
 
-            <!-- ROW 2: Risk Distribution & Health Check Grid -->
-            <div class="grid-2 margin-bottom">
-                <div class="card">
-                    <h3 class="info-card-title">Real-Time Risk Breakdown</h3>
-                    <div class="risk-badge-grid">
-                        <div class="risk-badge-card critical">
-                            <span class="risk-count" id="dash-crit-count">1</span>
-                            <span class="risk-title">Critical Risk (RDP/Leaks)</span>
+            <!-- TAB 1: OPERATIONAL DASHBOARD (/dashboard) -->
+            <section id="tab-dashboard" class="tab-content active">
+                <div class="hero-header">
+                    <h1 class="hero-title">Attack Surface Dashboard</h1>
+                    <p class="hero-subtitle">Real-time health status, target posture, and scan performance metrics.</p>
+                </div>
+
+                <!-- ROW 1: Health Status & Metric Cards -->
+                <div class="grid-3 margin-bottom">
+                    <div class="metric-box status-card">
+                        <div class="status-indicator-box">
+                            <div class="status-dot green"></div>
+                            <span class="metric-label">System Health</span>
                         </div>
+                        <span class="metric-value small" id="dash-sys-status">ONLINE</span>
+                        <span class="metric-subtext" id="dash-org-name">Organization: MITS</span>
+                    </div>
+
+                    <div class="metric-box">
+                        <span class="metric-value" id="dash-total-open">3</span>
+                        <span class="metric-label">Active Exposures</span>
+                    </div>
+
+                    <div class="metric-box">
+                        <span class="metric-value" id="dash-monitored-targets">1</span>
+                        <span class="metric-label">Monitored Targets</span>
+                    </div>
+                </div>
+
+                <!-- ROW 2: Risk Distribution & Health Check Grid -->
+                <div class="grid-2 margin-bottom">
+                    <div class="card">
+                        <h3 class="info-card-title">Real-Time Risk Breakdown</h3>
+                        <div class="risk-badge-grid">
+                            <div class="risk-badge-card critical">
+                                <span class="risk-count" id="dash-crit-count">1</span>
+                                <span class="risk-title">Critical Risk (RDP/Leaks)</span>
+                            </div>
                         <div class="risk-badge-card low">
                             <span class="risk-count" id="dash-low-count">2</span>
                             <span class="risk-title">Low Risk (Web 80/443)</span>
