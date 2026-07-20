@@ -950,6 +950,10 @@ body {
     border-color: var(--border-color);
 }
 
+.auth-screen.hidden {
+    display: none !important;
+}
+
 .qr-box {
     background: #ffffff;
     padding: 16px;
