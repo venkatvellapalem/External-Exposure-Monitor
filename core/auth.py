@@ -9,12 +9,95 @@ import bcrypt
 import pyotp
 import qrcode
 import jwt
+from cryptography.fernet import Fernet
 from core.logger import get_logger
 
 logger = get_logger()
 
 JWT_SECRET = os.getenv("JWT_SECRET", "easm_super_secure_jwt_secret_key_2026_mits")
 JWT_ALGORITHM = "HS256"
+
+def _get_fernet_key() -> bytes:
+    """Derives a deterministic 32-byte urlsafe base64 Fernet key from JWT_SECRET."""
+    raw_key = (JWT_SECRET + "easm_fernet_vault_salt_2026_mits").encode('utf-8')
+    key_32 = (raw_key * 2)[:32]
+    return base64.urlsafe_b64encode(key_32)
+
+class RateLimiter:
+    """Smart IP Rate Limiter supporting human-error 10-min cooldowns & permanent brute-force lockouts."""
+    def __init__(self):
+        self.ip_data = {}
+
+    def check_ip(self, ip: str) -> tuple[bool, str]:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        record = self.ip_data.get(ip)
+        if not record:
+            return True, "IP clear."
+
+        if record.get("permanently_blocked"):
+            return False, "Your IP has been PERMANENTLY BLOCKED due to repeated brute-force attacks. Contact Root Admin."
+
+        cooldown_until = record.get("cooldown_until")
+        if cooldown_until and now < cooldown_until:
+            remaining_sec = int((cooldown_until - now).total_seconds())
+            remaining_min = max(1, remaining_sec // 60)
+            return False, f"Too many failed login attempts. Temporary cooling period active ({remaining_min} mins remaining)."
+
+        return True, "IP clear."
+
+    def record_failure(self, ip: str) -> str:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        record = self.ip_data.get(ip, {
+            "failed_count": 0,
+            "cooldown_until": None,
+            "cooldown_violations": 0,
+            "permanently_blocked": False
+        })
+
+        record["failed_count"] += 1
+        logger.warning(f"[!] Failed login attempt from IP {ip} (Count: {record['failed_count']}/5)")
+
+        if record["failed_count"] >= 5:
+            record["cooldown_violations"] += 1
+            record["failed_count"] = 0
+
+            if record["cooldown_violations"] >= 3:
+                record["permanently_blocked"] = True
+                record["cooldown_until"] = None
+                self.ip_data[ip] = record
+                logger.error(f"[SECURITY ALERT] IP {ip} PERMANENTLY BLOCKED after {record['cooldown_violations']} cooldown violations!")
+                return "Your IP has been PERMANENTLY BLOCKED due to continuous brute-force attacks."
+
+            record["cooldown_until"] = now + datetime.timedelta(minutes=10)
+            self.ip_data[ip] = record
+            logger.warning(f"[!] IP {ip} placed on 10-minute cooling period (Violation {record['cooldown_violations']}/3)")
+            return "Too many failed attempts. Your IP has been placed on a 10-minute cooling period."
+
+        self.ip_data[ip] = record
+        attempts_left = 5 - record["failed_count"]
+        return f"Invalid credentials. {attempts_left} attempts remaining before 10-minute cooling period."
+
+    def record_success(self, ip: str):
+        if ip in self.ip_data and not self.ip_data[ip].get("permanently_blocked"):
+            del self.ip_data[ip]
+
+    def list_blocked_ips(self) -> list:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        result = []
+        for ip, d in self.ip_data.items():
+            if d.get("permanently_blocked"):
+                result.append({"ip": ip, "status": "PERMANENT_LOCKOUT", "violations": d.get("cooldown_violations")})
+            elif d.get("cooldown_until") and now < d.get("cooldown_until"):
+                remaining_sec = int((d["cooldown_until"] - now).total_seconds())
+                result.append({"ip": ip, "status": "10_MIN_COOLDOWN", "remaining_min": max(1, remaining_sec // 60)})
+        return result
+
+    def unblock_ip(self, ip: str) -> bool:
+        if ip in self.ip_data:
+            del self.ip_data[ip]
+            logger.info(f"[+] Root Admin unblocked IP {ip}")
+            return True
+        return False
 
 class AuthManager:
     """Enterprise-grade Auth and IAM Engine supporting RBAC, salted bcrypt hashing, TOTP MFA, and JWT session tokens."""
@@ -35,8 +118,13 @@ class AuthManager:
 
     def _ensure_users_file(self):
         """Bootstraps default Root Admin user if database doesn't exist."""
-        if not self.users_file.exists():
+        vault_file = self.users_file.parent / "users.vault"
+        if not self.users_file.exists() and not vault_file.exists():
             self._bootstrap_admin()
+        elif self.users_file.exists() and not vault_file.exists():
+            # Sync existing users.json to users.vault
+            users = self._load_users()
+            self._save_users(users)
 
     def _bootstrap_admin(self):
         """Creates initial root_admin account: admin / Admin@2026Secure!"""
@@ -55,6 +143,19 @@ class AuthManager:
         logger.info("[+] Bootstrapped initial Root Admin account ('admin')")
 
     def _load_users(self) -> dict:
+        vault_file = self.users_file.parent / "users.vault"
+        fernet = Fernet(_get_fernet_key())
+
+        # Check encrypted vault file first
+        if vault_file.exists():
+            try:
+                encrypted_data = vault_file.read_bytes()
+                decrypted_json = fernet.decrypt(encrypted_data).decode('utf-8')
+                return json.loads(decrypted_json)
+            except Exception as e:
+                logger.warning(f"[!] Failed to decrypt users.vault: {e}")
+
+        # Fallback to plain JSON file
         if not self.users_file.exists():
             self._bootstrap_admin()
         try:
@@ -64,11 +165,22 @@ class AuthManager:
             return {}
 
     def _save_users(self, data: dict):
+        # Save to plain JSON file
         try:
             with self.users_file.open("w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4)
         except Exception as e:
-            logger.error(f"[!] Failed to save users database: {e}")
+            logger.error(f"[!] Failed to save users JSON: {e}")
+
+        # Save AES-256 encrypted vault file
+        try:
+            vault_file = self.users_file.parent / "users.vault"
+            fernet = Fernet(_get_fernet_key())
+            json_bytes = json.dumps(data).encode('utf-8')
+            encrypted_bytes = fernet.encrypt(json_bytes)
+            vault_file.write_bytes(encrypted_bytes)
+        except Exception as e:
+            logger.error(f"[!] Failed to save AES-256 encrypted vault: {e}")
 
     @staticmethod
     def hash_password(password: str) -> str:

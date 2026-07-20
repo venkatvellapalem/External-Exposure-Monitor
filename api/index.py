@@ -547,8 +547,17 @@ def trigger_scan():
 # AUTHENTICATION & IAM SYSTEM ROUTES
 # ==========================================
 
+from core.auth import AuthManager, RateLimiter, _get_fernet_key
+
+rate_limiter = RateLimiter()
+
 @app.route('/api/auth/login', methods=['POST'])
 def auth_login():
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr).split(",")[0].strip()
+    allowed, status_msg = rate_limiter.check_ip(client_ip)
+    if not allowed:
+        return jsonify({"success": False, "message": status_msg}), 429
+
     data = request.json or {}
     username = data.get("username", "").strip().lower()
     password = data.get("password", "")
@@ -558,8 +567,10 @@ def auth_login():
 
     user = auth_manager.get_user(username)
     if not user or not auth_manager.verify_password(password, user["password_hash"]):
-        return jsonify({"success": False, "message": "Invalid username or password."}), 401
+        fail_msg = rate_limiter.record_failure(client_ip)
+        return jsonify({"success": False, "message": fail_msg}), 401
 
+    rate_limiter.record_success(client_ip)
     return jsonify({
         "success": True,
         "username": username,
