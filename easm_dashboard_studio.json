@@ -1,6 +1,6 @@
 {
     "title": "EASM SOC Command Center",
-    "description": "Enterprise External Attack Surface Monitor (Dashboard Studio)",
+    "description": "External Attack Surface Monitor (Dashboard Studio)",
     "theme": "dark",
     "visualizations": {
         "viz_total_exposures": {

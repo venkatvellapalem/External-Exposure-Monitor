@@ -100,7 +100,7 @@ class RateLimiter:
         return False
 
 class AuthManager:
-    """Enterprise-grade Auth and IAM Engine supporting RBAC, salted bcrypt hashing, TOTP MFA, and JWT session tokens."""
+    """Auth and IAM Engine supporting RBAC, salted bcrypt hashing, TOTP MFA, and JWT session tokens."""
 
     def __init__(self, users_file: str = "data/users.json"):
         target_path = Path(users_file)
