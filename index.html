@@ -261,7 +261,7 @@
                     <div class="download-option-box">
                         <h4>Manual Source Archive</h4>
                         <p>Download full source code ZIP archive for offline air-gapped environments.</p>
-                        <a href="https://github.com/venkatvellapalem/External-Exposure-Monitor/archive/refs/heads/main.zip" class="pill-btn secondary small">Download ZIP Archive</a>
+                        <a href="/api/download/zip" class="pill-btn secondary small" id="btn-download-zip">Download ZIP Archive</a>
                     </div>
                     <div class="download-option-box">
                         <h4>GitHub Clone URL</h4>
@@ -504,11 +504,11 @@ Waiting for scan trigger...</pre>
                 <form id="form-create-user" class="config-form">
                     <div class="form-row">
                         <div class="form-group half">
-                            <label>Username</label>
+                            <label>Username <span class="required-asterisk">*(required)</span></label>
                             <input type="text" id="iam-new-username" class="form-input" placeholder="" required autocomplete="off">
                         </div>
                         <div class="form-group half">
-                            <label>Role Assignment</label>
+                            <label>Role Assignment <span class="required-asterisk">*(required)</span></label>
                             <select id="iam-new-role" class="form-input">
                                 <option value="soc_analyst">SOC Analyst (Operational Access)</option>
                                 <option value="read_only_auditor">Read-Only Auditor (View Reports)</option>
@@ -519,7 +519,12 @@ Waiting for scan trigger...</pre>
 
                     <div class="form-row">
                         <div class="form-group half">
-                            <label>New User Initial Password (Min 8 Chars, 1 Letter, 1 Number, 1 Special Char)</label>
+                            <label style="display:flex; align-items:center; gap:6px;">
+                                <span>New User Initial Password <span class="required-asterisk">*(required)</span></span>
+                                <span class="info-tooltip-trigger" data-tooltip="Minimum 8 characters containing at least 1 letter (a-z, A-Z), 1 number (0-9), and 1 special character.">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; color:var(--text-muted, #71717a); cursor:pointer;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                </span>
+                            </label>
                             <div class="password-input-wrapper">
                                 <input type="password" id="iam-new-password" class="form-input" placeholder="" required autocomplete="new-password">
                                 <button type="button" class="btn-toggle-pass" data-target="iam-new-password" title="Toggle Password Visibility">
@@ -531,7 +536,7 @@ Waiting for scan trigger...</pre>
                             </div>
                         </div>
                         <div class="form-group half">
-                            <label>Confirm Initial Password</label>
+                            <label>Confirm Initial Password <span class="required-asterisk">*(required)</span></label>
                             <div class="password-input-wrapper">
                                 <input type="password" id="iam-confirm-password" class="form-input" placeholder="" required autocomplete="new-password">
                                 <button type="button" class="btn-toggle-pass" data-target="iam-confirm-password" title="Toggle Password Visibility">
@@ -552,14 +557,19 @@ Waiting for scan trigger...</pre>
                                     <input type="checkbox" id="iam-force-reset" checked>
                                     <span class="slider"></span>
                                 </span>
-                                <span class="switch-label">Require user to change password on first login (Enforces 16+ char complexity policy)</span>
+                                <span class="switch-label" style="display:inline-flex; align-items:center; gap:6px;">
+                                    <span>Require user to change password on first login</span>
+                                    <span class="info-tooltip-trigger" data-tooltip="Enforces a mandatory 16+ character complex password change during the user's first login session.">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; color:var(--text-muted, #71717a); cursor:pointer;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                    </span>
+                                </span>
                             </label>
                         </div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group full">
-                            <label>Current Admin Password (Required to Authorize Creation)</label>
+                            <label>Current Admin Password <span class="required-asterisk">*(required)</span></label>
                             <div class="password-input-wrapper">
                                 <input type="password" id="iam-admin-password" class="form-input" placeholder="" required autocomplete="current-password">
                                 <button type="button" class="btn-toggle-pass" data-target="iam-admin-password" title="Toggle Password Visibility">
@@ -652,7 +662,10 @@ Waiting for scan trigger...</pre>
                             <option value="ALL">All Users</option>
                         </select>
                     </div>
-                    <button class="pill-btn secondary small" id="btn-refresh-logs">Refresh Logs</button>
+                    <button class="pill-btn secondary small" id="btn-refresh-logs" title="Refresh Audit Logs">
+                        <svg id="refresh-logs-icon" class="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; margin-right:6px;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                        <span>Refresh Logs</span>
+                    </button>
                 </div>
 
                 <div class="table-container">

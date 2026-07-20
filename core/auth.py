@@ -296,9 +296,17 @@ class AuthManager:
     def generate_recovery_keys(self, count: int = 3) -> list[str]:
         return [self.generate_recovery_key() for _ in range(count)]
 
+    def _get_audit_log_file(self) -> Path:
+        primary = self.users_file.parent / "audit_log.json"
+        try:
+            primary.parent.mkdir(parents=True, exist_ok=True)
+            return primary
+        except Exception:
+            return Path("/tmp/audit_log.json")
+
     def log_audit(self, username: str, role: str, action: str, details: str, category: str = "IAM", severity: str = "INFO"):
         """Logs structured security audit event to audit_log.json."""
-        log_file = self.users_file.parent / "audit_log.json"
+        log_file = self._get_audit_log_file()
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         entry = {
             "id": secrets.token_hex(6),
@@ -324,15 +332,15 @@ class AuthManager:
             logger.error(f"[!] Failed to write audit log: {e}")
 
     def get_audit_logs(self, category: str = None, username: str = None) -> list:
-        log_file = self.users_file.parent / "audit_log.json"
+        log_file = self._get_audit_log_file()
         if not log_file.exists():
             return []
         try:
             logs = json.loads(log_file.read_text(encoding="utf-8"))
-            if category and category != "ALL":
-                logs = [l for l in logs if l.get("category") == category]
-            if username and username != "ALL":
-                logs = [l for l in logs if l.get("username") == username]
+            if category and category.upper() != "ALL":
+                logs = [l for l in logs if l.get("category", "").upper() == category.upper()]
+            if username and username.upper() != "ALL":
+                logs = [l for l in logs if l.get("username", "").lower() == username.lower()]
             return logs
         except Exception:
             return []

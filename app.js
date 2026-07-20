@@ -575,6 +575,8 @@ async function handleLogout(reasonMsg) {
     showAuthModal('login');
 }
 
+let keysMaskedState = [true, true, true];
+
 async function loadAdminRecoveryKey() {
     try {
         const res = await fetch('/api/iam/recovery-key');
@@ -582,29 +584,56 @@ async function loadAdminRecoveryKey() {
         const container = document.getElementById('iam-display-recovery-keys-container');
         if (container && data.success && data.recovery_keys) {
             activeRecoveryKeys = data.recovery_keys;
-            container.innerHTML = '';
-            data.recovery_keys.forEach((key, idx) => {
-                const box = document.createElement('div');
-                box.className = 'breakglass-key-card';
-                box.innerHTML = `
-                    <div class="key-card-header">
-                        <span class="key-card-title">Key #${idx + 1}</span>
-                        <span class="key-card-status">ACTIVE ●</span>
-                    </div>
-                    <div class="key-card-body">
-                        <code>${key}</code>
-                        <button class="copy-btn" onclick="copySingleKey('${key}')" title="Copy Key #${idx + 1}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                            </svg>
-                        </button>
-                    </div>
-                `;
-                container.appendChild(box);
-            });
+            renderRecoveryKeysGrid(container, data.recovery_keys);
         }
     } catch (e) {}
+}
+
+function renderRecoveryKeysGrid(container, keys) {
+    container.innerHTML = '';
+    keys.forEach((key, idx) => {
+        const isMasked = keysMaskedState[idx] !== false;
+        const displayKey = isMasked ? 'EASM-••••-••••-••••-••••' : key;
+        const box = document.createElement('div');
+        box.className = 'breakglass-key-card';
+        box.innerHTML = `
+            <div class="key-card-header">
+                <span class="key-card-title">Key #${idx + 1}</span>
+                <span class="key-card-status">ACTIVE ●</span>
+            </div>
+            <div class="key-card-body">
+                <code style="font-size:12px; letter-spacing:1px;">${displayKey}</code>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <button class="copy-btn" onclick="toggleKeyMask(${idx})" title="${isMasked ? 'Show Key' : 'Mask Key'}">
+                        <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
+                            ${isMasked ? `
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            ` : `
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                <line x1="1" y1="1" x2="23" y2="23"></line>
+                            `}
+                        </svg>
+                    </button>
+                    <button class="copy-btn" onclick="copySingleKey('${key}')" title="Copy Key #${idx + 1}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `;
+        container.appendChild(box);
+    });
+}
+
+function toggleKeyMask(idx) {
+    keysMaskedState[idx] = !keysMaskedState[idx];
+    const container = document.getElementById('iam-display-recovery-keys-container');
+    if (container && activeRecoveryKeys) {
+        renderRecoveryKeysGrid(container, activeRecoveryKeys);
+    }
 }
 
 function copySingleKey(key) {
@@ -783,6 +812,9 @@ async function deleteIamUser(username) {
 async function loadAuditLogs() {
     const category = document.getElementById('logs-category-filter')?.value || 'ALL';
     const username = document.getElementById('logs-user-filter')?.value || 'ALL';
+    const icon = document.getElementById('refresh-logs-icon');
+
+    if (icon) icon.classList.add('spinning');
 
     try {
         const res = await fetch(`/api/logs?category=${category}&username=${username}`);
@@ -811,6 +843,10 @@ async function loadAuditLogs() {
         });
     } catch (e) {
         console.error("Failed to load audit logs:", e);
+    } finally {
+        setTimeout(() => {
+            if (icon) icon.classList.remove('spinning');
+        }, 400);
     }
 }
 
@@ -1060,6 +1096,32 @@ function initCopyButtons() {
         navigator.clipboard.writeText(text).then(() => {
             showToast("GitHub clone command copied to clipboard!");
         });
+    });
+
+    document.getElementById('btn-download-zip')?.addEventListener('click', () => {
+        fetch('/api/logs/event', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                action: 'FILE_DOWNLOADED',
+                details: 'Downloaded source code ZIP archive (External-Exposure-Monitor.zip)',
+                category: 'FILES',
+                severity: 'INFO'
+            })
+        }).catch(() => {});
+    });
+
+    document.getElementById('btn-download-json')?.addEventListener('click', () => {
+        fetch('/api/logs/event', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                action: 'FILE_DOWNLOADED',
+                details: 'Downloaded Splunk Dashboard Studio JSON configuration',
+                category: 'FILES',
+                severity: 'INFO'
+            })
+        }).catch(() => {});
     });
 
     document.getElementById('btn-copy-all-keys')?.addEventListener('click', () => {

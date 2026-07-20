@@ -1,5 +1,45 @@
 [
   {
+    "id": "74d190cb1d3b",
+    "timestamp": "2026-07-20T16:47:37.397777+00:00",
+    "username": "analyst1",
+    "role": "soc_analyst",
+    "action": "USER_CREATED",
+    "details": "User account 'analyst1' created with role 'soc_analyst'",
+    "category": "IAM",
+    "severity": "INFO"
+  },
+  {
+    "id": "cbdd443b0572",
+    "timestamp": "2026-07-20T16:47:36.621195+00:00",
+    "username": "analyst1",
+    "role": "user",
+    "action": "USER_REVOKED",
+    "details": "User account 'analyst1' revoked by admin",
+    "category": "IAM",
+    "severity": "WARNING"
+  },
+  {
+    "id": "d954ab1fbff1",
+    "timestamp": "2026-07-20T16:46:56.083682+00:00",
+    "username": "analyst1",
+    "role": "soc_analyst",
+    "action": "USER_CREATED",
+    "details": "User account 'analyst1' created with role 'soc_analyst'",
+    "category": "IAM",
+    "severity": "INFO"
+  },
+  {
+    "id": "fd0e246f6059",
+    "timestamp": "2026-07-20T16:46:55.286694+00:00",
+    "username": "analyst1",
+    "role": "user",
+    "action": "USER_REVOKED",
+    "details": "User account 'analyst1' revoked by admin",
+    "category": "IAM",
+    "severity": "WARNING"
+  },
+  {
     "id": "ad3235a32611",
     "timestamp": "2026-07-20T16:34:59.193911+00:00",
     "username": "analyst1",

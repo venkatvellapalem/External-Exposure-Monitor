@@ -220,6 +220,20 @@ def download_breakglass_keys():
         headers={"Content-Disposition": "attachment;filename=easm_breakglass_keys.txt"}
     )
 
+@app.route('/api/logs/event', methods=['POST'])
+def record_log_event():
+    current_user = get_current_user_from_request()
+    uname = current_user.get("username") if current_user else "admin"
+    urole = current_user.get("role") if current_user else "root_admin"
+    data = request.json or {}
+    action = data.get("action", "FILE_DOWNLOADED")
+    details = data.get("details", "Downloaded system file")
+    category = data.get("category", "FILES")
+    severity = data.get("severity", "INFO")
+
+    auth_manager.log_audit(uname, urole, action, details, category=category, severity=severity)
+    return jsonify({"success": True})
+
 def import_datetime_now():
     import datetime
     return datetime.datetime.now(datetime.timezone.utc).isoformat()

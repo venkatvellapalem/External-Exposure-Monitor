@@ -1499,3 +1499,60 @@ body {
     padding-top: 14px;
     border-top: 1px solid var(--border-color, #27272a);
 }
+
+/* Plain Red Font Required Field Indicator */
+.required-asterisk {
+    color: #ef4444 !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    margin-left: 4px !important;
+    background: transparent !important;
+    padding: 0 !important;
+    border: none !important;
+}
+
+/* Information Tooltip */
+.info-tooltip-trigger {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.info-tooltip-trigger:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #18181b;
+    color: #f4f4f5;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.4;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #3f3f46;
+    white-space: normal;
+    width: max-content;
+    max-width: 260px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    pointer-events: none;
+    animation: fadeInTooltip 0.15s ease-out;
+}
+
+@keyframes fadeInTooltip {
+    from { opacity: 0; transform: translate(-50%, 4px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Refresh Icon Animation */
+.refresh-icon.spinning {
+    animation: spinRotate 0.6s linear infinite;
+}
+
+@keyframes spinRotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
