@@ -979,6 +979,13 @@ function initCopyButtons() {
         });
     });
 
+    document.getElementById('btn-copy-git-clone')?.addEventListener('click', () => {
+        const text = document.getElementById('git-clone-command').textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showToast("GitHub clone command copied to clipboard!");
+        });
+    });
+
     document.getElementById('btn-copy-all-keys')?.addEventListener('click', () => {
         if (activeRecoveryKeys && activeRecoveryKeys.length > 0) {
             const formatted = activeRecoveryKeys.map((k, i) => `Key #${i+1}: ${k}`).join('\n');

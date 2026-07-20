@@ -125,6 +125,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     IAM Users
                 </button>
+                <button class="drawer-item" data-tab="tab-logs" id="drawer-link-logs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    Audit Logs
+                </button>
             </div>
         </div>
     </div>
@@ -263,7 +267,13 @@
                         <h4>GitHub Clone URL</h4>
                         <p>Clone directly using Git CLI for automated CI/CD deployment pipelines.</p>
                         <div class="code-box small-code">
-                            <code>git clone https://github.com/venkatvellapalem/External-Exposure-Monitor.git</code>
+                            <code id="git-clone-command">git clone https://github.com/venkatvellapalem/External-Exposure-Monitor.git</code>
+                            <button class="copy-btn" id="btn-copy-git-clone" title="Copy Git Clone Command">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -472,27 +482,15 @@ Waiting for scan trigger...</pre>
                     </div>
                 </div>
 
+                <div class="card">
                     <h3 class="info-card-title">Dashboard Studio Code</h3>
                     <p class="info-card-desc">Download or copy the latest Dashboard Studio JSON code with drilldowns and series color mappings.</p>
                     <div class="action-footer">
                         <a href="/context/easm_dashboard_studio.json" download="easm_dashboard_studio.json" class="pill-btn secondary">Download Dashboard JSON</a>
                     </div>
                 </div>
-                <button class="drawer-item" data-tab="tab-iam" id="drawer-link-iam">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    IAM Users
-                </button>
-                <button class="drawer-item" data-tab="tab-logs" id="drawer-link-logs">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    Audit Logs
-                </button>
             </div>
-        </div>
-    </div>
-
-    <main class="main-layout">
-        <!-- Toast Notification Container -->
-        <div id="toast-container" class="toast-container"></div>
+        </section>
         
         <!-- TAB 8: IDENTITY & ACCESS MANAGEMENT (/iam) -->
         <section id="tab-iam" class="tab-content">
