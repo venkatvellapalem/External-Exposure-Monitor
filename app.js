@@ -164,6 +164,32 @@ async function testHec() {
     const token = document.getElementById('cfg-splunk-token').value;
 
     showToast("Testing connection to Splunk HEC...");
+
+    try {
+        const payload = JSON.stringify({
+            sourcetype: "_json",
+            source: "easm_web_browser_test",
+            event: { message: "Splunk connection test from browser client." }
+        });
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Splunk ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: payload,
+            mode: 'cors'
+        });
+
+        if (res.ok) {
+            showToast("Splunk HEC connection successful! (Direct browser test)");
+            return;
+        }
+    } catch (browserErr) {
+        console.log("Direct browser test failed or CORS restricted, attempting server proxy...", browserErr);
+    }
+
     try {
         const res = await fetch('/api/test-hec', {
             method: 'POST',
