@@ -82,6 +82,7 @@ def get_target_ips():
 
 def main():
     logger.info("=== EASM Collector started ===")
+    config = ConfigLoader().load()
     
     try:
         splunk = SplunkClient()
