@@ -1,0 +1,22 @@
+[
+  {
+    "id": "e6f2c4044f64",
+    "timestamp": "2026-07-20T16:18:55.496896+00:00",
+    "username": "analyst1",
+    "role": "soc_analyst",
+    "action": "USER_CREATED",
+    "details": "User account 'analyst1' created with role 'soc_analyst'",
+    "category": "IAM",
+    "severity": "INFO"
+  },
+  {
+    "id": "327efee8b8fd",
+    "timestamp": "2026-07-20T16:18:54.474504+00:00",
+    "username": "analyst1",
+    "role": "user",
+    "action": "USER_REVOKED",
+    "details": "User account 'analyst1' revoked by admin",
+    "category": "IAM",
+    "severity": "WARNING"
+  }
+]

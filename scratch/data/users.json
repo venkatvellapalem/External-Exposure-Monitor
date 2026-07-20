@@ -8,15 +8,25 @@
         "mfa_secret": "",
         "recovery_key": "EASM-RECOVER-4CC4-55CB-5D74-AEFF",
         "recovery_key_hash": "$2b$12$L3whao350NjceU8Xt6.ZWOLRmiHIPDZ0OfmkKMEBrZ5.6L9cowXbq",
-        "created_at": "2026-07-20T16:02:11.003566+00:00"
+        "created_at": "2026-07-20T16:02:11.003566+00:00",
+        "recovery_keys": [
+            "EASM-RECOVER-A7A4-82BF-AE49-0DB0",
+            "EASM-RECOVER-11F8-861A-569C-8E03",
+            "EASM-RECOVER-7569-377B-E16E-C3FF"
+        ],
+        "recovery_key_hashes": [
+            "$2b$12$vEMkBOttDMhRjrDs.9u80.zyvj/UCErq1weku8bcRvPaJM.zet38S",
+            "$2b$12$y/cFQ2MOz42djscKAK.ku.S9UtnlcxL83pKTI..4dmGxAaZk6xZF.",
+            "$2b$12$aPmvkb105Iw.fhXWGcf15uPXPNKiHRi1D7T2k/k3OLVaTFYZCIX6O"
+        ]
     },
     "tempuser1": {
         "username": "tempuser1",
-        "password_hash": "$2b$12$DNFHQ12ZnZZJxLrHrdocsuXsAO2vsIfzs7e1IKPTfcipdBFTNGDUq",
+        "password_hash": "$2b$12$f.U1fex/y7NVqL1OprWwhOKYkUlubQu5oD.iEt/XXwz7LNvvtkXbK",
         "role": "soc_analyst",
-        "must_change_password": false,
+        "must_change_password": true,
         "mfa_enabled": false,
         "mfa_secret": "",
-        "created_at": "2026-07-20T16:02:11.861776+00:00"
+        "created_at": "2026-07-20T16:18:59.182980+00:00"
     }
 }

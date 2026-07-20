@@ -472,16 +472,28 @@ Waiting for scan trigger...</pre>
                     </div>
                 </div>
 
-                <div class="card">
                     <h3 class="info-card-title">Dashboard Studio Code</h3>
                     <p class="info-card-desc">Download or copy the latest Dashboard Studio JSON code with drilldowns and series color mappings.</p>
                     <div class="action-footer">
                         <a href="/context/easm_dashboard_studio.json" download="easm_dashboard_studio.json" class="pill-btn secondary">Download Dashboard JSON</a>
                     </div>
                 </div>
+                <button class="drawer-item" data-tab="tab-iam" id="drawer-link-iam">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    IAM Users
+                </button>
+                <button class="drawer-item" data-tab="tab-logs" id="drawer-link-logs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    Audit Logs
+                </button>
             </div>
-        </section>
+        </div>
+    </div>
 
+    <main class="main-layout">
+        <!-- Toast Notification Container -->
+        <div id="toast-container" class="toast-container"></div>
+        
         <!-- TAB 8: IDENTITY & ACCESS MANAGEMENT (/iam) -->
         <section id="tab-iam" class="tab-content">
             <div class="section-header">
@@ -509,7 +521,7 @@ Waiting for scan trigger...</pre>
 
                     <div class="form-row">
                         <div class="form-group half">
-                            <label>New User Initial Password</label>
+                            <label>New User Initial Password (Min 8 Chars, 1 Letter, 1 Number, 1 Special Char)</label>
                             <div class="password-input-wrapper">
                                 <input type="password" id="iam-new-password" class="form-input" placeholder="" required autocomplete="new-password">
                                 <button type="button" class="btn-toggle-pass" data-target="iam-new-password" title="Toggle Password Visibility">
@@ -537,9 +549,12 @@ Waiting for scan trigger...</pre>
 
                     <div class="form-row">
                         <div class="form-group full">
-                            <label class="checkbox-label" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:500;">
-                                <input type="checkbox" id="iam-force-reset" checked style="width:18px; height:18px; cursor:pointer;">
-                                <span>Require user to change password on first login (Enforces 16+ char complexity policy)</span>
+                            <label class="switch-container">
+                                <span class="ui-switch">
+                                    <input type="checkbox" id="iam-force-reset" checked>
+                                    <span class="slider"></span>
+                                </span>
+                                <span class="switch-label">Require user to change password on first login (Enforces 16+ char complexity policy)</span>
                             </label>
                         </div>
                     </div>
@@ -567,16 +582,15 @@ Waiting for scan trigger...</pre>
 
             <!-- Master Emergency Break-Glass Recovery Kit Card -->
             <div class="card">
-                <h3 class="card-subtitle">Master Emergency Break-Glass Recovery Kit</h3>
-                <p class="info-card-desc">Keep this 256-bit emergency recovery key stored safely in an offline password manager or vault. If admin credentials are lost or locked out, this key can recover full Root Admin access without email or OTP dependencies.</p>
-                <div class="code-box margin-bottom" style="margin-top:12px;">
-                    <code id="iam-display-recovery-key">EASM-RECOVER-LOADING...</code>
-                    <button class="copy-btn" id="btn-copy-recovery-key" title="Copy Master Recovery Key">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                        </svg>
-                    </button>
+                <div class="card-header-flex">
+                    <div>
+                        <h3 class="card-subtitle">Master Emergency Break-Glass Recovery Kit (3 Offline Keys)</h3>
+                        <p class="info-card-desc">Store these 3 single-use break-glass keys offline in a secure password vault. If admin credentials are lost or locked out, any key can recover full Root Admin access. Each key burns automatically after single use.</p>
+                    </div>
+                    <button class="pill-btn secondary small" id="btn-copy-all-keys">Copy All 3 Keys</button>
+                </div>
+                <div id="iam-display-recovery-keys-container" style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+                    <div class="code-box"><code>EASM-RECOVER-LOADING...</code></div>
                 </div>
             </div>
 
@@ -590,12 +604,59 @@ Waiting for scan trigger...</pre>
                                 <th>RBAC Role</th>
                                 <th>TOTP MFA</th>
                                 <th>Password Policy</th>
-                                <th>Action</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="iam-users-table-body">
                             <tr>
                                 <td colspan="5" class="text-muted">Loading IAM directory...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 9: MASTER AUDIT LOG MONITOR (/logs) -->
+        <section id="tab-logs" class="tab-content">
+            <div class="section-header">
+                <h2>Master Security Audit Trail Monitor</h2>
+                <p>Real-time audit log monitor tracking all IAM management, user authentication, asset changes, and system activities.</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header-flex margin-bottom">
+                    <div style="display:flex; gap:14px; align-items:center;">
+                        <select id="logs-category-filter" class="form-input" style="width:180px;">
+                            <option value="ALL">All Categories</option>
+                            <option value="IAM">IAM Management</option>
+                            <option value="AUTH">Authentication & MFA</option>
+                            <option value="SECURITY">Security & Recovery</option>
+                            <option value="ASSETS">Asset Inventory</option>
+                            <option value="SCANS">Scan Execution</option>
+                        </select>
+                        <select id="logs-user-filter" class="form-input" style="width:160px;">
+                            <option value="ALL">All Users</option>
+                        </select>
+                    </div>
+                    <button class="pill-btn secondary small" id="btn-refresh-logs">Refresh Logs</button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>User</th>
+                                <th>Role</th>
+                                <th>Event Action</th>
+                                <th>Details</th>
+                                <th>Severity</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-table-body">
+                            <tr>
+                                <td colspan="6" class="text-muted">Loading audit log stream...</td>
                             </tr>
                         </tbody>
                     </table>

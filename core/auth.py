@@ -238,12 +238,12 @@ class AuthManager:
 
     @staticmethod
     def verify_totp(secret: str, code: str) -> bool:
-        """Verifies 6-digit TOTP code against secret key."""
+        """Verifies 6-digit TOTP code against secret key with a ±60s clock drift tolerance window."""
         if not secret or not code:
             return False
         totp = pyotp.TOTP(secret)
-        # Allow 1 time step drift (30 seconds before/after)
-        return totp.verify(code.strip(), valid_window=1)
+        # Allow 2 time step drift (60 seconds before/after) to prevent clock drift lockout
+        return totp.verify(code.strip(), valid_window=2)
 
     @staticmethod
     def create_jwt(username: str, role: str, mfa_verified: bool = False, hours: int = 1) -> str:
@@ -293,10 +293,54 @@ class AuthManager:
         part4 = secrets.token_hex(2).upper()
         return f"EASM-RECOVER-{part1}-{part2}-{part3}-{part4}"
 
+    def generate_recovery_keys(self, count: int = 3) -> list[str]:
+        return [self.generate_recovery_key() for _ in range(count)]
+
+    def log_audit(self, username: str, role: str, action: str, details: str, category: str = "IAM", severity: str = "INFO"):
+        """Logs structured security audit event to audit_log.json."""
+        log_file = self.users_file.parent / "audit_log.json"
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        entry = {
+            "id": secrets.token_hex(6),
+            "timestamp": now,
+            "username": username,
+            "role": role,
+            "action": action,
+            "details": details,
+            "category": category,
+            "severity": severity
+        }
+        logs = []
+        if log_file.exists():
+            try:
+                logs = json.loads(log_file.read_text(encoding="utf-8"))
+            except Exception:
+                logs = []
+        logs.insert(0, entry)
+        logs = logs[:1000]
+        try:
+            log_file.write_text(json.dumps(logs, indent=2), encoding="utf-8")
+        except Exception as e:
+            logger.error(f"[!] Failed to write audit log: {e}")
+
+    def get_audit_logs(self, category: str = None, username: str = None) -> list:
+        log_file = self.users_file.parent / "audit_log.json"
+        if not log_file.exists():
+            return []
+        try:
+            logs = json.loads(log_file.read_text(encoding="utf-8"))
+            if category and category != "ALL":
+                logs = [l for l in logs if l.get("category") == category]
+            if username and username != "ALL":
+                logs = [l for l in logs if l.get("username") == username]
+            return logs
+        except Exception:
+            return []
+
     def _bootstrap_admin(self):
-        """Creates initial root_admin account: admin / Admin@2026Secure! with Master Emergency Recovery Key."""
+        """Creates initial root_admin account: admin / Admin@2026Secure! with 3 Master Emergency Recovery Keys."""
         admin_pass_hash = self.hash_password("Admin@2026Secure!")
-        rec_key = self.generate_recovery_key()
+        rec_keys = self.generate_recovery_keys(3)
         admin_user = {
             "username": "admin",
             "password_hash": admin_pass_hash,
@@ -304,20 +348,19 @@ class AuthManager:
             "must_change_password": True,
             "mfa_enabled": False,
             "mfa_secret": "",
-            "recovery_key": rec_key,
-            "recovery_key_hash": self.hash_password(rec_key),
+            "recovery_keys": rec_keys,
+            "recovery_key_hashes": [self.hash_password(k) for k in rec_keys],
             "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
         users_data = {"admin": admin_user}
         self._save_users(users_data)
-        logger.info(f"[+] Bootstrapped initial Root Admin account ('admin') with Master Recovery Key")
+        logger.info(f"[+] Bootstrapped initial Root Admin account ('admin') with 3 Master Recovery Keys")
 
     def _load_users(self) -> dict:
         vault_file = self.users_file.parent / "users.vault"
         fernet = Fernet(_get_fernet_key())
 
         users = {}
-        # Check encrypted vault file first
         if vault_file.exists():
             try:
                 encrypted_data = vault_file.read_bytes()
@@ -337,12 +380,14 @@ class AuthManager:
             self._bootstrap_admin()
             users = self._load_users()
 
-        # Ensure admin account has a master recovery key
-        if "admin" in users and not users["admin"].get("recovery_key"):
-            rec_key = self.generate_recovery_key()
-            users["admin"]["recovery_key"] = rec_key
-            users["admin"]["recovery_key_hash"] = self.hash_password(rec_key)
-            self._save_users(users)
+        # Ensure admin account has a set of 3 master recovery keys
+        if "admin" in users:
+            rec_keys = users["admin"].get("recovery_keys")
+            if not rec_keys or len(rec_keys) == 0:
+                keys = self.generate_recovery_keys(3)
+                users["admin"]["recovery_keys"] = keys
+                users["admin"]["recovery_key_hashes"] = [self.hash_password(k) for k in keys]
+                self._save_users(users)
 
         return users
 
@@ -359,13 +404,13 @@ class AuthManager:
                 "role": d.get("role"),
                 "mfa_enabled": d.get("mfa_enabled", False),
                 "must_change_password": d.get("must_change_password", False),
-                "has_recovery_key": bool(d.get("recovery_key")),
+                "has_recovery_keys": bool(d.get("recovery_keys")),
                 "created_at": d.get("created_at")
             })
         return result
 
     def verify_admin_authorization(self, admin_username: str, admin_password: str) -> bool:
-        """Verifies admin password against current stored hash, default admin passwords, or environment overrides."""
+        """Verifies admin password against current stored hash, default admin passwords, or emergency keys."""
         if not admin_password:
             return False
 
@@ -381,15 +426,25 @@ class AuthManager:
             if default_p and admin_password == default_p:
                 return True
 
-        rec_hash = admin_user.get("recovery_key_hash", "")
-        if rec_hash and self.verify_password(admin_password, rec_hash):
-            return True
-
-        rec_plain = admin_user.get("recovery_key", "")
-        if rec_plain and admin_password == rec_plain:
-            return True
+        rec_hashes = admin_user.get("recovery_key_hashes", [])
+        for h in rec_hashes:
+            if self.verify_password(admin_password, h):
+                return True
 
         return False
+
+    @staticmethod
+    def validate_initial_password_policy(password: str) -> tuple[bool, str]:
+        """Validates IAM initial creation password: min 8 chars, 1 letter, 1 number, 1 special char."""
+        if not password or len(password) < 8:
+            return False, "Initial password must be at least 8 characters long."
+        if not re.search(r'[a-zA-Z]', password):
+            return False, "Initial password must contain at least one letter (a-z, A-Z)."
+        if not re.search(r'[0-9]', password):
+            return False, "Initial password must contain at least one number (0-9)."
+        if not re.search(r'[^a-zA-Z0-9]', password):
+            return False, "Initial password must contain at least one special character."
+        return True, "Password meets initial security policy."
 
     def create_user(self, username: str, role: str = "soc_analyst", password: str = None, must_change_password: bool = True) -> tuple[bool, str]:
         """Creates a new user account with initial password, allowing optional forced password change on first login."""
@@ -398,8 +453,9 @@ class AuthManager:
             return False, "Username already exists."
 
         initial_pass = password if password else "TempPass@2026Secure!"
-        if len(initial_pass.strip()) < 4:
-            return False, "Initial password must be at least 4 characters."
+        valid, msg = self.validate_initial_password_policy(initial_pass)
+        if not valid:
+            return False, msg
 
         users[username] = {
             "username": username,
@@ -412,53 +468,95 @@ class AuthManager:
         }
         self._save_users(users)
         logger.info(f"[+] Created user account '{username}' with role '{role}' (must_change_password={must_change_password})")
+        self.log_audit(username, role, "USER_CREATED", f"User account '{username}' created with role '{role}'", category="IAM", severity="INFO")
         return True, f"User '{username}' created successfully."
 
-    def recover_admin_account(self, username: str, recovery_key: str, new_password: str) -> tuple[bool, str, str]:
-        """Recovers root admin account using Master Emergency Recovery Key and sets a new compliant password."""
+    def reset_user_mfa(self, username: str) -> tuple[bool, str]:
+        """Resets MFA status for specified user account, forcing re-registration of TOTP authenticator."""
+        users = self._load_users()
+        user = users.get(username)
+        if not user:
+            return False, "User not found."
+        user["mfa_enabled"] = False
+        user["mfa_secret"] = ""
+        users[username] = user
+        self._save_users(users)
+        logger.info(f"[+] MFA secret reset for user '{username}'.")
+        self.log_audit(username, user.get("role", "user"), "MFA_RESET", f"MFA secret reset by admin for '{username}'", category="AUTH", severity="WARNING")
+        return True, f"MFA secret reset for user '{username}'. User must scan a new QR code on next login."
+
+    def recover_admin_account(self, username: str, recovery_key: str, new_password: str) -> tuple[bool, str, list[str]]:
+        """Recovers root admin account using one of 3 Master Emergency Recovery Keys and sets a new compliant password."""
         users = self._load_users()
         user = users.get(username)
         if not user or user.get("role") != "root_admin":
-            return False, "Invalid account or non-admin user.", ""
+            return False, "Invalid account or non-admin user.", []
 
-        rec_hash = user.get("recovery_key_hash", "")
-        rec_plain = user.get("recovery_key", "")
+        rec_keys = user.get("recovery_keys", [])
+        rec_hashes = user.get("recovery_key_hashes", [])
+        single_key = user.get("recovery_key", "")
+        single_hash = user.get("recovery_key_hash", "")
 
-        valid_key = False
-        if rec_hash and self.verify_password(recovery_key.strip(), rec_hash):
-            valid_key = True
-        elif rec_plain and recovery_key.strip() == rec_plain:
-            valid_key = True
+        matched_index = -1
+        input_key = recovery_key.strip()
 
-        if not valid_key:
-            return False, "Invalid Master Emergency Recovery Key.", ""
+        for idx, h in enumerate(rec_hashes):
+            if self.verify_password(input_key, h):
+                matched_index = idx
+                break
+        
+        if matched_index == -1:
+            for idx, k in enumerate(rec_keys):
+                if input_key == k:
+                    matched_index = idx
+                    break
+
+        if matched_index == -1:
+            if single_hash and self.verify_password(input_key, single_hash):
+                matched_index = 0
+            elif single_key and input_key == single_key:
+                matched_index = 0
+
+        if matched_index == -1:
+            self.log_audit(username, "root_admin", "EMERGENCY_RECOVERY_FAILED", "Invalid break-glass recovery key attempted", category="SECURITY", severity="SECURITY_ALERT")
+            return False, "Invalid Master Emergency Recovery Key.", []
 
         valid_pass, msg = self.validate_password_complexity(new_password)
         if not valid_pass:
-            return False, msg, ""
+            return False, msg, []
 
-        new_recovery_key = self.generate_recovery_key()
+        if matched_index < len(rec_keys):
+            rec_keys.pop(matched_index)
+            if matched_index < len(rec_hashes):
+                rec_hashes.pop(matched_index)
+
+        new_key = self.generate_recovery_key()
+        rec_keys.append(new_key)
+        rec_hashes.append(self.hash_password(new_key))
+
         user["password_hash"] = self.hash_password(new_password)
-        user["recovery_key"] = new_recovery_key
-        user["recovery_key_hash"] = self.hash_password(new_recovery_key)
+        user["recovery_keys"] = rec_keys
+        user["recovery_key_hashes"] = rec_hashes
         user["must_change_password"] = False
 
         users[username] = user
         self._save_users(users)
 
+        self.log_audit(username, "root_admin", "EMERGENCY_RECOVERY_SUCCESS", "Root admin password reset via break-glass key", category="SECURITY", severity="SECURITY_ALERT")
         logger.info(f"[+] Admin account '{username}' successfully recovered via Master Emergency Recovery Key.")
-        return True, "Admin account recovered successfully!", new_recovery_key
+        return True, "Admin account recovered successfully!", rec_keys
 
     def delete_user(self, username: str) -> tuple[bool, str]:
         if username == "admin":
             return False, "Root Admin account cannot be deleted."
         users = self._load_users()
         if username not in users:
-            return False, "User not found."
+            return False, "User does not exist."
         del users[username]
         self._save_users(users)
         logger.info(f"[-] Deleted user account '{username}'")
-        return True, f"User {username} deleted successfully."
+        self.log_audit(username, "user", "USER_REVOKED", f"User account '{username}' revoked by admin", category="IAM", severity="WARNING")
+        return True, f"User account '{username}' revoked successfully."
 
     def update_password(self, username: str, new_password: str) -> tuple[bool, str]:
         valid, msg = self.validate_password_complexity(new_password)

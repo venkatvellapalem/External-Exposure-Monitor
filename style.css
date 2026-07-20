@@ -1342,3 +1342,88 @@ body {
     height: 18px;
     color: var(--text-muted);
 }
+
+/* Modern Sleek UI Switch Toggle Button */
+.switch-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.ui-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.ui-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.ui-switch .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: var(--border-color, #d4d4d8);
+    transition: .25s ease;
+    border-radius: 24px;
+}
+
+.ui-switch .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #ffffff;
+    transition: .25s ease;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.ui-switch input:checked + .slider {
+    background-color: #18181b;
+}
+
+.ui-switch input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+.switch-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-main);
+}
+
+/* Audit Logs Table Badges */
+.badge-severity {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-severity.INFO {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.badge-severity.WARNING {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.badge-severity.SECURITY_ALERT {
+    background: #fee2e2;
+    color: #b91c1c;
+}

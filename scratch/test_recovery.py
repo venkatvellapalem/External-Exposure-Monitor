@@ -20,12 +20,22 @@ def test_recovery_and_iam():
     assert verified, "Admin authorization failed for default password"
     print("[+] Test 2 Passed: Admin authorization password verified successfully")
 
-    # Test 3: Flexible IAM Creation with optional password change
-    ok, m = auth.create_user("tempuser1", role="soc_analyst", password="simplepass123", must_change_password=False)
-    assert ok, f"Failed to create user: {m}"
+    # Test 3: Flexible IAM Creation with initial password policy (min 8 chars, letter, number, special char)
+    auth.delete_user("tempuser1")
+    fail1, m1 = auth.create_user("temp1", role="soc_analyst", password="Short1!", must_change_password=True)
+    assert not fail1, "Short password should fail"
+    
+    fail2, m2 = auth.create_user("temp2", role="soc_analyst", password="NoSpecialChar1", must_change_password=True)
+    assert not fail2, "Password without special character should fail"
+
+    fail3, m3 = auth.create_user("temp3", role="soc_analyst", password="NoNumberChar!", must_change_password=True)
+    assert not fail3, "Password without number should fail"
+
+    ok, m = auth.create_user("tempuser1", role="soc_analyst", password="UserPass@2026", must_change_password=True)
+    assert ok, f"Failed to create user with valid 8+ char initial password: {m}"
     user = auth.get_user("tempuser1")
-    assert user["must_change_password"] == False, "must_change_password toggle mismatch"
-    print("[+] Test 3 Passed: Flexible initial password without 16-char mandate created successfully")
+    assert user["must_change_password"] == True, "must_change_password toggle mismatch"
+    print(f"[+] Test 3 Passed: Initial password policy enforced (min 8 chars, letter, number, special char) and default checked toggle verified successfully")
 
     print("\nALL RECOVERY & IAM POLICY TESTS PASSED SUCCESSFULLY!\n")
 

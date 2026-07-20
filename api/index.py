@@ -767,26 +767,59 @@ def auth_admin_recovery():
     if not username or not recovery_key or not new_password:
         return jsonify({"success": False, "message": "Username, Master Emergency Recovery Key, and New Password are required."}), 400
 
-    success, msg, new_key = auth_manager.recover_admin_account(username, recovery_key, new_password)
+    success, msg, new_keys = auth_manager.recover_admin_account(username, recovery_key, new_password)
     if not success:
         return jsonify({"success": False, "message": msg}), 400
 
     return jsonify({
         "success": True,
         "message": msg,
-        "new_recovery_key": new_key
+        "recovery_keys": new_keys
     })
 
 @app.route('/api/iam/recovery-key', methods=['GET'])
 def get_admin_recovery_key():
-    """Root Admin route to view or retrieve Master Emergency Recovery Key."""
+    """Root Admin route to view or retrieve 3 Master Emergency Recovery Keys."""
     current_user = get_current_user_from_request()
     if not current_user or current_user.get("role") != "root_admin":
         return jsonify({"success": False, "message": "Access denied. Root Admin role required."}), 403
 
     admin_user = auth_manager.get_user(current_user.get("username"))
-    rec_key = admin_user.get("recovery_key", "EASM-RECOVER-DEFAULT-KEY")
-    return jsonify({"success": True, "recovery_key": rec_key})
+    rec_keys = admin_user.get("recovery_keys", [])
+    if not rec_keys and admin_user.get("recovery_key"):
+        rec_keys = [admin_user.get("recovery_key")]
+    return jsonify({"success": True, "recovery_keys": rec_keys})
+
+@app.route('/api/iam/reset-mfa', methods=['POST'])
+def iam_reset_mfa():
+    """Root Admin route to reset MFA secret for a user, forcing re-setup on next login."""
+    current_user = get_current_user_from_request()
+    if not current_user or current_user.get("role") != "root_admin":
+        return jsonify({"success": False, "message": "Access denied. Root Admin role required."}), 403
+
+    data = request.json or {}
+    target_username = data.get("username", "").strip().lower()
+    if not target_username:
+        return jsonify({"success": False, "message": "Target username required."}), 400
+
+    success, msg = auth_manager.reset_user_mfa(target_username)
+    if not success:
+        return jsonify({"success": False, "message": msg}), 400
+
+    return jsonify({"success": True, "message": msg})
+
+@app.route('/api/logs', methods=['GET'])
+def get_system_logs():
+    """Returns Master Audit Trail logs for activity monitoring."""
+    current_user = get_current_user_from_request()
+    if not current_user:
+        return jsonify({"success": False, "message": "Authentication required."}), 401
+
+    category = request.args.get("category", "ALL")
+    user_filter = request.args.get("username", "ALL")
+
+    logs = auth_manager.get_audit_logs(category=category, username=user_filter)
+    return jsonify({"success": True, "logs": logs, "total_count": len(logs)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

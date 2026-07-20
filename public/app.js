@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('form-create-user')?.addEventListener('submit', createIamUser);
     document.getElementById('btn-test-hec')?.addEventListener('click', testHec);
     document.getElementById('btn-user-logout')?.addEventListener('click', () => handleLogout());
+    document.getElementById('btn-refresh-logs')?.addEventListener('click', loadAuditLogs);
+    document.getElementById('logs-category-filter')?.addEventListener('change', loadAuditLogs);
+    document.getElementById('logs-user-filter')?.addEventListener('change', loadAuditLogs);
     document.getElementById('btn-clear-log')?.addEventListener('click', () => {
         document.getElementById('scan-log-output').textContent = '=== EASM Collector Console Output ===\nWaiting for scan trigger...';
     });
@@ -34,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
 let currentUser = null;
 let pendingAuthUser = null;
 let pendingMfaSecret = null;
+let activeRecoveryKeys = [];
 
 let lastUserActivity = Date.now();
 let sessionStartTime = Date.now();
@@ -46,7 +50,8 @@ const TAB_SLUG_MAP = {
     'tab-about': 'about',
     'tab-splunk': 'splunk',
     'tab-config': 'config',
-    'tab-iam': 'iam'
+    'tab-iam': 'iam',
+    'tab-logs': 'logs'
 };
 
 const SLUG_TAB_MAP = {
@@ -57,7 +62,8 @@ const SLUG_TAB_MAP = {
     'about': 'tab-about',
     'splunk': 'tab-splunk',
     'config': 'tab-config',
-    'iam': 'tab-iam'
+    'iam': 'tab-iam',
+    'logs': 'tab-logs'
 };
 
 function initInactivityTracker() {
@@ -123,6 +129,8 @@ function switchTab(tabId, updateUrl = true) {
     if (tabId === 'tab-iam') {
         loadIamUsers();
         loadAdminRecoveryKey();
+    } else if (tabId === 'tab-logs') {
+        loadAuditLogs();
     }
 
     if (updateUrl && TAB_SLUG_MAP[tabId]) {
@@ -205,10 +213,12 @@ function showUserBadge(username, role) {
 function applyRbacUI(role) {
     const iamDropdownItem = document.getElementById('dropdown-item-iam');
     const drawerIamItem = document.getElementById('drawer-link-iam');
+    const drawerLogsItem = document.getElementById('drawer-link-logs');
 
     const isRootAdmin = (role === 'root_admin');
     if (iamDropdownItem) iamDropdownItem.style.display = isRootAdmin ? 'flex' : 'none';
     if (drawerIamItem) drawerIamItem.style.display = isRootAdmin ? 'flex' : 'none';
+    if (drawerLogsItem) drawerLogsItem.style.display = (isRootAdmin || role === 'soc_analyst') ? 'flex' : 'none';
 
     if (role === 'read_only_auditor') {
         const runScanBtn = document.getElementById('btn-run-scan');
@@ -351,7 +361,6 @@ function clearAuthErrors() {
 }
 
 function initAuthFlow() {
-    // Show Recovery Screen Trigger
     document.getElementById('btn-show-recovery')?.addEventListener('click', () => {
         showAuthModal('recovery');
     });
@@ -360,7 +369,6 @@ function initAuthFlow() {
         showAuthModal('login');
     });
 
-    // Step 1: Login Form
     document.getElementById('form-auth-login')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         clearAuthErrors();
@@ -407,7 +415,6 @@ function initAuthFlow() {
         }
     });
 
-    // Step 2: MFA Verification Form
     document.getElementById('form-auth-mfa')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         clearAuthErrors();
@@ -448,7 +455,6 @@ function initAuthFlow() {
         }
     });
 
-    // Step 3: Mandatory Password Reset Screen
     document.getElementById('form-auth-password')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         clearAuthErrors();
@@ -482,7 +488,6 @@ function initAuthFlow() {
         }
     });
 
-    // Step 4: Master Emergency Break-Glass Recovery Form
     document.getElementById('form-auth-recovery')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         clearAuthErrors();
@@ -538,11 +543,32 @@ async function loadAdminRecoveryKey() {
     try {
         const res = await fetch('/api/iam/recovery-key');
         const data = await res.json();
-        const codeEl = document.getElementById('iam-display-recovery-key');
-        if (codeEl && data.success) {
-            codeEl.textContent = data.recovery_key;
+        const container = document.getElementById('iam-display-recovery-keys-container');
+        if (container && data.success && data.recovery_keys) {
+            activeRecoveryKeys = data.recovery_keys;
+            container.innerHTML = '';
+            data.recovery_keys.forEach((key, idx) => {
+                const box = document.createElement('div');
+                box.className = 'code-box';
+                box.innerHTML = `
+                    <span>Key #${idx + 1}: <code>${key}</code></span>
+                    <button class="copy-btn" onclick="copySingleKey('${key}')" title="Copy Key #${idx + 1}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                    </button>
+                `;
+                container.appendChild(box);
+            });
         }
     } catch (e) {}
+}
+
+function copySingleKey(key) {
+    navigator.clipboard.writeText(key).then(() => {
+        showToast(`Master Recovery Key '${key}' copied to clipboard!`);
+    });
 }
 
 async function loadIamUsers() {
@@ -550,8 +576,22 @@ async function loadIamUsers() {
         const res = await fetch('/api/iam/users');
         const data = await res.json();
         const tbody = document.getElementById('iam-users-table-body');
+        const userFilterSelect = document.getElementById('logs-user-filter');
+
         if (!tbody) return;
         tbody.innerHTML = '';
+
+        if (userFilterSelect && data.users) {
+            const currentVal = userFilterSelect.value;
+            userFilterSelect.innerHTML = '<option value="ALL">All Users</option>';
+            data.users.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.username;
+                opt.textContent = u.username;
+                userFilterSelect.appendChild(opt);
+            });
+            userFilterSelect.value = currentVal;
+        }
 
         if (!data.users || data.users.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="text-muted">No users found.</td></tr>';
@@ -565,12 +605,38 @@ async function loadIamUsers() {
                 <td><span class="badge-role ${u.role}">${u.role.replace('_', ' ')}</span></td>
                 <td><span class="badge-status ${u.mfa_enabled ? 'green' : 'red'}">${u.mfa_enabled ? 'Enforced' : 'Pending'}</span></td>
                 <td><span class="badge-status ${u.must_change_password ? 'red' : 'green'}">${u.must_change_password ? 'Reset Required' : 'Compliant'}</span></td>
-                <td>${u.username !== 'admin' ? `<button class="btn-delete-asset" onclick="deleteIamUser('${u.username}')">Revoke</button>` : '<span class="text-muted">Protected</span>'}</td>
+                <td>
+                    ${u.username !== 'admin' ? `
+                        <button class="btn-delete-asset danger" onclick="deleteIamUser('${u.username}')">Revoke</button>
+                        <button class="btn-delete-asset" onclick="resetUserMfa('${u.username}')" style="margin-left:6px; background:var(--bg-tertiary, #3f3f46); color:#38bdf8;">Reset MFA</button>
+                    ` : '<span class="text-muted">Protected</span>'}
+                </td>
             `;
             tbody.appendChild(tr);
         });
     } catch (e) {
         console.error("Failed to load IAM users:", e);
+    }
+}
+
+async function resetUserMfa(username) {
+    if (!confirm(`Reset TOTP MFA secret for '${username}'? The user will be required to scan a new QR code on next login.`)) return;
+
+    try {
+        const res = await fetch('/api/iam/reset-mfa', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            loadIamUsers();
+        } else {
+            showToast("Failed to reset MFA: " + data.message);
+        }
+    } catch (e) {
+        showToast("Error resetting MFA secret.");
     }
 }
 
@@ -635,6 +701,40 @@ async function deleteIamUser(username) {
         }
     } catch (e) {
         showToast("Error revoking user.");
+    }
+}
+
+async function loadAuditLogs() {
+    const category = document.getElementById('logs-category-filter')?.value || 'ALL';
+    const username = document.getElementById('logs-user-filter')?.value || 'ALL';
+
+    try {
+        const res = await fetch(`/api/logs?category=${category}&username=${username}`);
+        const data = await res.json();
+        const tbody = document.getElementById('logs-table-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!data.logs || data.logs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-muted">No audit logs found matching filters.</td></tr>';
+            return;
+        }
+
+        data.logs.forEach(log => {
+            const tr = document.createElement('tr');
+            const formattedTime = new Date(log.timestamp).toLocaleString();
+            tr.innerHTML = `
+                <td><small class="text-muted">${formattedTime}</small></td>
+                <td><strong>${log.username}</strong></td>
+                <td><span class="badge-role ${log.role}">${log.role.replace('_', ' ')}</span></td>
+                <td><code>${log.action}</code></td>
+                <td>${log.details}</td>
+                <td><span class="badge-severity ${log.severity}">${log.severity}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error("Failed to load audit logs:", e);
     }
 }
 
@@ -879,11 +979,13 @@ function initCopyButtons() {
         });
     });
 
-    document.getElementById('btn-copy-recovery-key')?.addEventListener('click', () => {
-        const text = document.getElementById('iam-display-recovery-key').textContent;
-        navigator.clipboard.writeText(text).then(() => {
-            showToast("Master Emergency Recovery Key copied to clipboard!");
-        });
+    document.getElementById('btn-copy-all-keys')?.addEventListener('click', () => {
+        if (activeRecoveryKeys && activeRecoveryKeys.length > 0) {
+            const formatted = activeRecoveryKeys.map((k, i) => `Key #${i+1}: ${k}`).join('\n');
+            navigator.clipboard.writeText(formatted).then(() => {
+                showToast("All 3 Master Emergency Recovery Keys copied to clipboard!");
+            });
+        }
     });
 }
 
@@ -903,7 +1005,6 @@ async function loadStatus() {
         const res = await fetch('/api/status');
         const data = await res.json();
 
-        // Dashboard Metrics
         if (document.getElementById('dash-total-open')) document.getElementById('dash-total-open').textContent = data.total_open || 0;
         if (document.getElementById('dash-monitored-targets')) document.getElementById('dash-monitored-targets').textContent = data.monitored_targets || 0;
         if (document.getElementById('dash-crit-count')) document.getElementById('dash-crit-count').textContent = data.critical_count || 0;
@@ -912,7 +1013,6 @@ async function loadStatus() {
         if (document.getElementById('dash-org-name')) document.getElementById('dash-org-name').textContent = `Organization: ${data.organization || 'MITS'}`;
         if (document.getElementById('ingest-rate-live')) document.getElementById('ingest-rate-live').textContent = data.ingestion_rate || '0.0 events/sec';
 
-        // Update Minimal Active/Inactive Health Badges
         const badgeHec = document.getElementById('badge-hec');
         const badgeCensys = document.getElementById('badge-censys');
         const badgeShodan = document.getElementById('badge-shodan');
@@ -933,7 +1033,6 @@ async function loadStatus() {
             badgeShodan.className = `badge-status ${statusStr === 'Inactive' ? 'red' : 'green'}`;
         }
 
-        // Direct Dashboard Studio SSO Link
         const dashUrl = "/api/auth/splunk-sso";
         const link8000 = document.getElementById('link-splunk-8000');
         const dashLink8000 = document.getElementById('dash-btn-splunk-8000');
