@@ -6,24 +6,18 @@ import urllib.error
 import ssl
 import yaml
 from pathlib import Path
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-static_dir = BASE_DIR / "public"
 
-if static_dir.exists():
-    app = Flask(__name__, static_folder=str(static_dir), static_url_path="")
-else:
-    app = Flask(__name__)
+app = Flask(__name__)
 
 # WSGI Handlers for Vercel Serverless Functions
 handler = app
 application = app
-
-# ponytail: simple serverless API entrypoint for Vercel and local dev. Handles /api/* endpoints only.
 
 def get_env_path():
     return BASE_DIR / ".env"
@@ -33,6 +27,40 @@ def get_assets_path():
 
 def get_baseline_path():
     return BASE_DIR / "data" / "baseline.json"
+
+@app.route('/')
+@app.route('/dashboard')
+@app.route('/download')
+@app.route('/about')
+@app.route('/scanner')
+@app.route('/assets')
+@app.route('/splunk')
+@app.route('/config')
+def serve_index():
+    index_file = BASE_DIR / "index.html"
+    if not index_file.exists():
+        index_file = BASE_DIR / "public" / "index.html"
+    if index_file.exists():
+        return send_file(str(index_file))
+    return jsonify({"status": "EASM API Engine Online"})
+
+@app.route('/style.css')
+def serve_css():
+    css_file = BASE_DIR / "style.css"
+    if not css_file.exists():
+        css_file = BASE_DIR / "public" / "style.css"
+    if css_file.exists():
+        return send_file(str(css_file), mimetype='text/css')
+    return "", 404
+
+@app.route('/app.js')
+def serve_js():
+    js_file = BASE_DIR / "app.js"
+    if not js_file.exists():
+        js_file = BASE_DIR / "public" / "app.js"
+    if js_file.exists():
+        return send_file(str(js_file), mimetype='application/javascript')
+    return "", 404
 
 @app.route('/api/status', methods=['GET'])
 def get_status():
