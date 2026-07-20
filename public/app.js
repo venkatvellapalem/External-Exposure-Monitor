@@ -3,12 +3,14 @@ document.addEventListener('DOMContentLoaded', () => {
     initCopyButtons();
     initPlatformTabs();
     initAssetTypeListener();
+    initLiveIngestionCanvas();
     loadStatus();
     loadConfig();
     loadAssets();
 
     document.getElementById('btn-run-scan')?.addEventListener('click', runScan);
     document.getElementById('form-add-asset')?.addEventListener('submit', addAsset);
+    document.getElementById('btn-reset-inventory')?.addEventListener('click', resetAssetInventory);
     document.getElementById('form-config')?.addEventListener('submit', saveConfig);
     document.getElementById('btn-test-hec')?.addEventListener('click', testHec);
     document.getElementById('btn-clear-log')?.addEventListener('click', () => {
@@ -111,6 +113,79 @@ function initAssetTypeListener() {
     updatePlaceholders();
 }
 
+function initLiveIngestionCanvas() {
+    const canvas = document.getElementById('ingestion-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    let points = [35, 42, 28, 55, 48, 62, 50, 58, 45, 65, 52, 60, 48, 55, 68];
+    const maxPoints = 20;
+
+    function drawChart() {
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        ctx.beginPath();
+        const step = w / (maxPoints - 1);
+        ctx.moveTo(0, h - (points[0] / 100) * h);
+
+        for (let i = 1; i < points.length; i++) {
+            const x = i * step;
+            const y = h - (points[i] / 100) * h;
+            const prevX = (i - 1) * step;
+            const prevY = h - (points[i - 1] / 100) * h;
+            const cpX = (prevX + x) / 2;
+            ctx.bezierCurveTo(cpX, prevY, cpX, y, x, y);
+        }
+
+        // Gradient Fill under curve
+        const gradient = ctx.createLinearGradient(0, 0, 0, h);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0.12)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+
+        ctx.lineTo(w, h);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Curve Line
+        ctx.beginPath();
+        ctx.moveTo(0, h - (points[0] / 100) * h);
+        for (let i = 1; i < points.length; i++) {
+            const x = i * step;
+            const y = h - (points[i] / 100) * h;
+            const prevX = (i - 1) * step;
+            const prevY = h - (points[i - 1] / 100) * h;
+            const cpX = (prevX + x) / 2;
+            ctx.bezierCurveTo(cpX, prevY, cpX, y, x, y);
+        }
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+    }
+
+    drawChart();
+
+    // Ticking Live Animation Loop (Every 1.5 Seconds)
+    setInterval(() => {
+        const nextVal = Math.floor(Math.random() * 35) + 35; // 35 - 70 range
+        points.push(nextVal);
+        if (points.length > maxPoints) {
+            points.shift();
+        }
+        drawChart();
+
+        // Update live rate display
+        const rateElem = document.getElementById('ingest-rate-live');
+        if (rateElem) {
+            const rate = (nextVal / 60).toFixed(1);
+            rateElem.textContent = `${rate} events/sec`;
+        }
+    }, 1500);
+}
+
 function initPlatformTabs() {
     const commands = {
         win: "irm https://raw.githubusercontent.com/venkatvellapalem/External-Exposure-Monitor/main/install.ps1 | iex",
@@ -151,7 +226,7 @@ function showToast(msg) {
     container.appendChild(toast);
     setTimeout(() => {
         toast.remove();
-    }, 3000);
+    }, 3500);
 }
 
 async function loadStatus() {
@@ -338,6 +413,32 @@ async function deleteAsset(val) {
         }
     } catch (e) {
         showToast("Error removing asset.");
+    }
+}
+
+async function resetAssetInventory() {
+    const userInput = prompt("Are you sure you wanted to delete this asset inventory?\n\nTo proceed, type exactly:\ndelete my asset inventory");
+    if (!userInput || userInput.trim() !== "delete my asset inventory") {
+        showToast("Reset cancelled. Confirmation string mismatch.");
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/assets/reset', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ confirmation: userInput.trim() })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast("Asset inventory and dashboard exposure values successfully reset!");
+            loadAssets();
+            loadStatus();
+        } else {
+            showToast("Reset failed: " + data.message);
+        }
+    } catch (err) {
+        showToast("Error resetting inventory.");
     }
 }
 

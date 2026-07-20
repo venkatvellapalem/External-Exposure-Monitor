@@ -421,6 +421,30 @@ def handle_assets():
         except Exception as e:
             return jsonify({"success": False, "message": str(e)})
 
+@app.route('/api/assets/reset', methods=['POST'])
+def reset_assets():
+    body = request.json or {}
+    confirm_text = body.get("confirmation", "").strip()
+    
+    if confirm_text != "delete my asset inventory":
+        return jsonify({"success": False, "message": "Confirmation string mismatch. Reset aborted."})
+
+    writable_assets = get_writable_file("config/assets.yaml")
+    try:
+        with writable_assets.open("w", encoding="utf-8") as f:
+            yaml.dump({"organization": "MITS", "assets": []}, f, default_flow_style=False)
+    except Exception:
+        pass
+
+    writable_baseline = get_writable_file("data/baseline.json")
+    try:
+        with writable_baseline.open("w", encoding="utf-8") as f:
+            json.dump({}, f, indent=4)
+    except Exception:
+        pass
+
+    return jsonify({"success": True, "message": "Asset inventory and baseline metrics successfully reset!"})
+
 @app.route('/api/scan', methods=['POST'])
 def trigger_scan():
     try:

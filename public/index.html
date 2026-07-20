@@ -51,7 +51,7 @@
                 <p class="hero-subtitle">Real-time health status, target posture, and scan performance metrics.</p>
             </div>
 
-            <!-- Health Status & Ingestion Cards -->
+            <!-- ROW 1: Health Status & Metric Cards -->
             <div class="grid-3 margin-bottom">
                 <div class="metric-box status-card">
                     <div class="status-indicator-box">
@@ -70,35 +70,10 @@
                 <div class="metric-box">
                     <span class="metric-value" id="dash-monitored-targets">1</span>
                     <span class="metric-label">Monitored Targets</span>
-            </div>
-
-            <!-- Live Ingestion Throughput Card -->
-            <div class="card margin-bottom">
-                <div class="card-header-flex">
-                    <div>
-                        <h3 class="info-card-title">Live Ingestion Rate & Scanning Throughput</h3>
-                        <p class="info-card-desc">Real-time scan event stream to Splunk HTTP Event Collector (Port 8088).</p>
-                    </div>
-                    <div class="pulse-badge">
-                        <span class="pulse-dot"></span>
-                        <span>0.8 events/sec</span>
-                    </div>
-                </div>
-                <div class="chart-container">
-                    <svg class="sparkline-chart" viewBox="0 0 500 80" preserveAspectRatio="none">
-                        <defs>
-                            <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stop-color="#000000" stop-opacity="0.15"/>
-                                <stop offset="100%" stop-color="#000000" stop-opacity="0.0"/>
-                            </linearGradient>
-                        </defs>
-                        <path d="M0,80 L0,55 Q125,15 250,45 T500,25 L500,80 Z" fill="url(#spark-grad)"/>
-                        <path d="M0,55 Q125,15 250,45 T500,25" fill="none" stroke="#000000" stroke-width="2.5"/>
-                    </svg>
                 </div>
             </div>
 
-            <!-- Risk Distribution & Health Check Grid -->
+            <!-- ROW 2: Risk Distribution & Health Check Grid -->
             <div class="grid-2 margin-bottom">
                 <div class="card">
                     <h3 class="info-card-title">Real-Time Risk Breakdown</h3>
@@ -133,13 +108,28 @@
                 </div>
             </div>
 
-            <!-- Quick Action Footer -->
-            <div class="card text-center">
-                <h3 class="info-card-title">Deep Investigation in Splunk SOC Center</h3>
-                <p class="info-card-desc">Open your Splunk Enterprise Web UI on Port 8000 to launch the interactive Dashboard Studio.</p>
-                <div class="action-footer justify-center">
-                    <a href="http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor" id="dash-btn-splunk-8000" target="_blank" class="pill-btn primary">Open Dashboard Studio App</a>
-                    <button class="pill-btn secondary" onclick="switchTab('tab-scanner')">Run EASM Scan Now</button>
+            <!-- ROW 3: Symmetrical Action & Live Ingestion Cards -->
+            <div class="grid-2 margin-bottom">
+                <div class="card text-center">
+                    <h3 class="info-card-title">Deep Investigation in Splunk SOC Center</h3>
+                    <p class="info-card-desc">Open your Splunk Enterprise Web UI on Port 8000 to launch the interactive Dashboard Studio.</p>
+                    <div class="action-footer justify-center">
+                        <a href="http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor" id="dash-btn-splunk-8000" target="_blank" class="pill-btn primary">Open Dashboard Studio App</a>
+                        <button class="pill-btn secondary" onclick="switchTab('tab-scanner')">Run EASM Scan Now</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header-flex">
+                        <h3 class="info-card-title">Live Ingestion Rate</h3>
+                        <div class="pulse-badge">
+                            <span class="pulse-dot"></span>
+                            <span id="ingest-rate-live">0.8 events/sec</span>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="ingestion-canvas" width="450" height="70"></canvas>
+                    </div>
                 </div>
             </div>
         </section>
@@ -309,6 +299,17 @@ Waiting for scan trigger...</pre>
                     </table>
                 </div>
             </div>
+
+            <!-- DANGER ZONE: Asset Inventory Reset -->
+            <div class="card danger-card margin-bottom">
+                <div class="card-header-flex">
+                    <div>
+                        <h3 class="info-card-title danger-text">Danger Zone: Reset Asset Inventory</h3>
+                        <p class="info-card-desc">Permanently wipe all registered asset targets and reset exposure dashboard baseline metrics.</p>
+                    </div>
+                    <button class="pill-btn danger" id="btn-reset-inventory">Reset Asset Inventory</button>
+                </div>
+            </div>
         </section>
 
         <!-- TAB 6: SETTINGS & CONFIGURATION (/config) -->
@@ -360,7 +361,7 @@ Waiting for scan trigger...</pre>
 
             <div class="grid-2">
                 <div class="card">
-                    <h3 class="info-card-title">Dashboard Studio App (Port 8000)</h3>
+                    <h3 class="info-card-title">Dashboard Studio App</h3>
                     <p class="info-card-desc">Access your custom Splunk Dashboard Studio instance directly on port 8000.</p>
                     <div class="action-footer">
                         <a href="http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor" id="link-splunk-8000" target="_blank" class="pill-btn primary">Open Dashboard Studio App</a>

@@ -827,3 +827,25 @@ body {
     height: 100%;
     display: block;
 }
+
+/* Danger Zone Styling */
+.danger-card {
+    border-color: #fca5a5;
+    background: #fff5f5;
+}
+
+.danger-text {
+    color: #dc2626;
+}
+
+.pill-btn.danger {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+}
+
+.pill-btn.danger:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+    box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2);
+}
