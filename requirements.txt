@@ -1,3 +1,8 @@
 flask
 pyyaml
 python-dotenv
+bcrypt
+pyotp
+qrcode
+pyjwt
+cryptography
