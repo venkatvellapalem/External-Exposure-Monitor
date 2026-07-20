@@ -8,8 +8,11 @@ import ssl
 import yaml
 import base64
 from pathlib import Path
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, redirect, make_response
 from dotenv import load_dotenv
+from functools import wraps
+from core.auth import AuthManager
+from core.splunk_sso import SplunkSSOManager
 
 load_dotenv()
 
@@ -22,6 +25,19 @@ handler = app
 application = app
 
 MASKED_PLACEHOLDER = "••••••••••••••••"
+
+auth_manager = AuthManager()
+splunk_sso_manager = SplunkSSOManager()
+
+def get_current_user_from_request():
+    token = request.cookies.get("easm_session")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+    if not token:
+        return None
+    return auth_manager.verify_jwt(token)
 
 def get_writable_file(relative_path: str) -> Path:
     target = BASE_DIR / relative_path
@@ -526,6 +542,192 @@ def trigger_scan():
         return jsonify({"success": False, "message": "Scan execution timed out after 45s."})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
+
+# ==========================================
+# AUTHENTICATION & IAM SYSTEM ROUTES
+# ==========================================
+
+@app.route('/api/auth/login', methods=['POST'])
+def auth_login():
+    data = request.json or {}
+    username = data.get("username", "").strip().lower()
+    password = data.get("password", "")
+
+    if not username or not password:
+        return jsonify({"success": False, "message": "Username and password required."}), 400
+
+    user = auth_manager.get_user(username)
+    if not user or not auth_manager.verify_password(password, user["password_hash"]):
+        return jsonify({"success": False, "message": "Invalid username or password."}), 401
+
+    return jsonify({
+        "success": True,
+        "username": username,
+        "role": user.get("role"),
+        "must_change_password": user.get("must_change_password", False),
+        "mfa_enabled": user.get("mfa_enabled", False),
+        "message": "Credentials verified. TOTP MFA verification required."
+    })
+
+@app.route('/api/auth/mfa-setup', methods=['POST'])
+def auth_mfa_setup():
+    data = request.json or {}
+    username = data.get("username", "").strip().lower()
+
+    if not username:
+        return jsonify({"success": False, "message": "Username required."}), 400
+
+    user = auth_manager.get_user(username)
+    if not user:
+        return jsonify({"success": False, "message": "User not found."}), 404
+
+    secret = user.get("mfa_secret") or auth_manager.generate_totp_secret()
+    qr_uri = auth_manager.generate_qr_code_base64(username, secret)
+
+    return jsonify({
+        "success": True,
+        "username": username,
+        "secret": secret,
+        "qr_code_uri": qr_uri
+    })
+
+@app.route('/api/auth/mfa-verify', methods=['POST'])
+def auth_mfa_verify():
+    data = request.json or {}
+    username = data.get("username", "").strip().lower()
+    code = data.get("code", "").strip()
+    new_secret = data.get("secret", "").strip()
+
+    if not username or not code:
+        return jsonify({"success": False, "message": "Username and TOTP code required."}), 400
+
+    user = auth_manager.get_user(username)
+    if not user:
+        return jsonify({"success": False, "message": "User not found."}), 404
+
+    secret_to_verify = new_secret if new_secret else user.get("mfa_secret")
+    if not secret_to_verify:
+        return jsonify({"success": False, "message": "MFA not configured for user."}), 400
+
+    if not auth_manager.verify_totp(secret_to_verify, code):
+        return jsonify({"success": False, "message": "Invalid TOTP code. Please try again."}), 401
+
+    if new_secret and not user.get("mfa_enabled"):
+        auth_manager.save_mfa_secret(username, new_secret)
+        user = auth_manager.get_user(username)
+
+    jwt_token = auth_manager.create_jwt(username, user.get("role"), mfa_verified=True)
+
+    resp = make_response(jsonify({
+        "success": True,
+        "message": "Authentication successful!",
+        "user": {
+            "username": username,
+            "role": user.get("role"),
+            "must_change_password": user.get("must_change_password", False),
+            "mfa_enabled": user.get("mfa_enabled", True)
+        },
+        "token": jwt_token
+    }))
+
+    resp.set_cookie(
+        "easm_session",
+        jwt_token,
+        httponly=True,
+        samesite="Lax",
+        max_age=12 * 3600
+    )
+    return resp
+
+@app.route('/api/auth/change-password', methods=['POST'])
+def auth_change_password():
+    current_user = get_current_user_from_request()
+    data = request.json or {}
+    username = data.get("username", "").strip().lower() or (current_user.get("username") if current_user else "")
+    new_password = data.get("new_password", "")
+
+    if not username or not new_password:
+        return jsonify({"success": False, "message": "Username and new password required."}), 400
+
+    success, msg = auth_manager.update_password(username, new_password)
+    if not success:
+        return jsonify({"success": False, "message": msg}), 400
+
+    return jsonify({"success": True, "message": "Password changed successfully."})
+
+@app.route('/api/auth/me', methods=['GET'])
+def auth_me():
+    current_user = get_current_user_from_request()
+    if not current_user:
+        return jsonify({"authenticated": False}), 200
+
+    username = current_user.get("username")
+    user = auth_manager.get_user(username)
+    if not user:
+        return jsonify({"authenticated": False}), 200
+
+    return jsonify({
+        "authenticated": True,
+        "username": username,
+        "role": user.get("role"),
+        "must_change_password": user.get("must_change_password", False),
+        "mfa_enabled": user.get("mfa_enabled", False)
+    })
+
+@app.route('/api/auth/logout', methods=['POST'])
+def auth_logout():
+    resp = make_response(jsonify({"success": True, "message": "Logged out successfully."}))
+    resp.set_cookie("easm_session", "", expires=0)
+    return resp
+
+@app.route('/api/auth/splunk-sso', methods=['GET'])
+def auth_splunk_sso():
+    current_user = get_current_user_from_request()
+    easm_role = current_user.get("role") if current_user else "root_admin"
+    sso_url = splunk_sso_manager.get_sso_redirect_url(easm_role)
+    return redirect(sso_url)
+
+# IAM User Management Routes (Root Admin Only)
+@app.route('/api/iam/users', methods=['GET', 'POST', 'DELETE'])
+def handle_iam_users():
+    current_user = get_current_user_from_request()
+    if not current_user or current_user.get("role") != "root_admin":
+        return jsonify({"success": False, "message": "Access denied. Root Admin role required."}), 403
+
+    if request.method == 'GET':
+        users_list = auth_manager.list_users()
+        return jsonify({"success": True, "users": users_list})
+
+    elif request.method == 'POST':
+        data = request.json or {}
+        username = data.get("username", "").strip().lower()
+        role = data.get("role", "soc_analyst").strip().lower()
+
+        if not username:
+            return jsonify({"success": False, "message": "Username required."}), 400
+
+        success, msg, temp_pass = auth_manager.create_user(username, role)
+        if not success:
+            return jsonify({"success": False, "message": msg}), 400
+
+        return jsonify({
+            "success": True,
+            "message": f"User '{username}' created cleanly. Temporary password: '{temp_pass}'",
+            "temporary_password": temp_pass
+        })
+
+    elif request.method == 'DELETE':
+        data = request.json or {}
+        username = data.get("username", "").strip().lower()
+
+        if not username:
+            return jsonify({"success": False, "message": "Username required."}), 400
+
+        success, msg = auth_manager.delete_user(username)
+        if not success:
+            return jsonify({"success": False, "message": msg}), 400
+
+        return jsonify({"success": True, "message": msg})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

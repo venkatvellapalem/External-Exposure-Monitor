@@ -33,8 +33,13 @@
                 <button class="nav-link" data-tab="tab-about">Architecture</button>
                 <button class="nav-link" data-tab="tab-splunk">Splunk SOC Hub</button>
                 <button class="nav-link" data-tab="tab-config">Settings</button>
+                <button class="nav-link" data-tab="tab-iam" id="nav-link-iam">IAM Users</button>
             </nav>
             <div class="nav-actions">
+                <div id="user-badge-container" class="user-badge-container" style="display:none;">
+                    <span id="user-display-name" class="user-name-tag">admin</span>
+                    <button class="pill-btn secondary small" id="btn-user-logout">Logout</button>
+                </div>
                 <a href="https://github.com/venkatvellapalem/External-Exposure-Monitor" target="_blank" class="nav-btn-icon" title="View Source on GitHub">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
@@ -118,7 +123,7 @@
                     <h3 class="info-card-title">Deep Investigation in Splunk SOC Center</h3>
                     <p class="info-card-desc">Open your Splunk Enterprise Web UI on Port 8000 to launch the interactive Dashboard Studio.</p>
                     <div class="action-footer justify-center">
-                        <a href="http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor" id="dash-btn-splunk-8000" target="_blank" class="pill-btn primary">Open Dashboard Studio App</a>
+                        <a href="/api/auth/splunk-sso" id="dash-btn-splunk-8000" target="_blank" class="pill-btn primary">Open Dashboard Studio App</a>
                         <button class="pill-btn secondary" onclick="switchTab('tab-scanner')">Run EASM Scan Now</button>
                     </div>
                 </div>
@@ -383,7 +388,7 @@ Waiting for scan trigger...</pre>
                     <h3 class="info-card-title">Dashboard Studio App</h3>
                     <p class="info-card-desc">Access your custom Splunk Dashboard Studio instance directly on port 8000.</p>
                     <div class="action-footer">
-                        <a href="http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor" id="link-splunk-8000" target="_blank" class="pill-btn primary">Open Dashboard Studio App</a>
+                        <a href="/api/auth/splunk-sso" id="link-splunk-8000" target="_blank" class="pill-btn primary">Open Dashboard Studio App</a>
                     </div>
                 </div>
 
@@ -393,6 +398,59 @@ Waiting for scan trigger...</pre>
                     <div class="action-footer">
                         <a href="/context/easm_dashboard_studio.json" download="easm_dashboard_studio.json" class="pill-btn secondary">Download Dashboard JSON</a>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 8: IDENTITY & ACCESS MANAGEMENT (/iam) -->
+        <section id="tab-iam" class="tab-content">
+            <div class="section-header">
+                <h2>Identity & Access Management (IAM)</h2>
+                <p>Manage user accounts, assign RBAC roles (Root Admin, SOC Analyst, Auditor), and monitor TOTP MFA enforcement.</p>
+            </div>
+
+            <div class="card">
+                <h3 class="card-subtitle">Create New User Account</h3>
+                <form id="form-create-user" class="config-form">
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Username</label>
+                            <input type="text" id="iam-new-username" class="form-input" placeholder="analyst_john" required autocomplete="off">
+                        </div>
+                        <div class="form-group half">
+                            <label>Role Assignment</label>
+                            <select id="iam-new-role" class="form-input">
+                                <option value="soc_analyst">SOC Analyst (Operational Access)</option>
+                                <option value="read_only_auditor">Read-Only Auditor (View Reports)</option>
+                                <option value="root_admin">Root Admin (Full System Control)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="pill-btn primary">Create IAM Account</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3 class="card-subtitle">Active IAM User Directory</h3>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>RBAC Role</th>
+                                <th>TOTP MFA</th>
+                                <th>Password Policy</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="iam-users-table-body">
+                            <tr>
+                                <td colspan="5" class="text-muted">Loading IAM directory...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -425,6 +483,70 @@ Waiting for scan trigger...</pre>
                 <div class="modal-actions">
                     <button type="button" class="pill-btn secondary" id="btn-cancel-config-reset">Cancel</button>
                     <button type="button" class="pill-btn danger" id="btn-confirm-config-reset">Confirm & Reset Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enterprise Authentication & Mandatory MFA Overlay Modal -->
+        <div id="auth-modal" class="modal-overlay hidden">
+            <div class="modal-card auth-modal-card">
+                <!-- SCREEN 1: Step 1 Username/Password Login -->
+                <div id="auth-screen-login" class="auth-screen">
+                    <h3 class="modal-title">EASM Enterprise Authentication</h3>
+                    <p class="modal-desc">Enter your credentials to authenticate into the External Exposure Engine.</p>
+                    <form id="form-auth-login">
+                        <div class="form-group margin-bottom">
+                            <label>Username</label>
+                            <input type="text" id="auth-login-username" class="form-input" placeholder="admin" required autocomplete="username">
+                        </div>
+                        <div class="form-group margin-bottom">
+                            <label>Password</label>
+                            <input type="password" id="auth-login-password" class="form-input" placeholder="••••••••••••••••" required autocomplete="current-password">
+                        </div>
+                        <div class="modal-actions">
+                            <button type="submit" class="pill-btn primary full-width">Sign In</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- SCREEN 2: Mandatory TOTP MFA Verification & Setup -->
+                <div id="auth-screen-mfa" class="auth-screen hidden">
+                    <h3 class="modal-title">Mandatory TOTP MFA Verification</h3>
+                    <p class="modal-desc">Scan the QR code with Google Authenticator or Microsoft Authenticator, then enter your 6-digit verification code.</p>
+                    
+                    <div id="auth-mfa-qr-container" class="qr-box text-center margin-bottom hidden">
+                        <img id="auth-qr-img" src="" alt="MFA QR Code" class="qr-code-img">
+                        <div class="qr-manual-key">Manual Key: <strong id="auth-mfa-secret-key"></strong></div>
+                    </div>
+
+                    <form id="form-auth-mfa">
+                        <div class="form-group margin-bottom">
+                            <label>6-Digit Authenticator Code</label>
+                            <input type="text" id="auth-totp-code" class="form-input text-center pincode-input" placeholder="000000" maxlength="6" required autocomplete="one-time-code">
+                        </div>
+                        <div class="modal-actions">
+                            <button type="submit" class="pill-btn primary full-width">Verify MFA Code</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- SCREEN 3: Mandatory Password Reset Screen -->
+                <div id="auth-screen-password" class="auth-screen hidden">
+                    <h3 class="modal-title danger-text">Mandatory Password Update</h3>
+                    <p class="modal-desc">Your account requires setting a 16+ character strong password (min 16 chars, uppercase, lowercase, number, special char).</p>
+                    <form id="form-auth-password">
+                        <div class="form-group margin-bottom">
+                            <label>New Compliant Password</label>
+                            <input type="password" id="auth-new-password" class="form-input" placeholder="Min 16 characters" required autocomplete="new-password">
+                        </div>
+                        <div class="form-group margin-bottom">
+                            <label>Confirm New Password</label>
+                            <input type="password" id="auth-confirm-password" class="form-input" placeholder="Confirm password" required autocomplete="new-password">
+                        </div>
+                        <div class="modal-actions">
+                            <button type="submit" class="pill-btn danger full-width">Update Password & Continue</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

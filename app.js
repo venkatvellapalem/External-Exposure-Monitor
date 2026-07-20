@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initResetModal();
     initConfigResetModal();
     initLiveIngestionCanvas();
+    initAuthFlow();
+
+    checkAuthSession();
     loadStatus();
     loadConfig();
     loadAssets();
@@ -13,13 +16,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-run-scan')?.addEventListener('click', runScan);
     document.getElementById('form-add-asset')?.addEventListener('submit', addAsset);
     document.getElementById('form-config')?.addEventListener('submit', saveConfig);
+    document.getElementById('form-create-user')?.addEventListener('submit', createIamUser);
     document.getElementById('btn-test-hec')?.addEventListener('click', testHec);
+    document.getElementById('btn-user-logout')?.addEventListener('click', handleLogout);
     document.getElementById('btn-clear-log')?.addEventListener('click', () => {
         document.getElementById('scan-log-output').textContent = '=== EASM Collector Console Output ===\nWaiting for scan trigger...';
     });
 
     window.addEventListener('popstate', handlePopState);
 });
+
+let currentUser = null;
+let pendingAuthUser = null;
+let pendingMfaSecret = null;
 
 const TAB_SLUG_MAP = {
     'tab-dashboard': 'dashboard',
@@ -28,7 +37,8 @@ const TAB_SLUG_MAP = {
     'tab-download': 'download',
     'tab-about': 'about',
     'tab-splunk': 'splunk',
-    'tab-config': 'config'
+    'tab-config': 'config',
+    'tab-iam': 'iam'
 };
 
 const SLUG_TAB_MAP = {
@@ -38,7 +48,8 @@ const SLUG_TAB_MAP = {
     'download': 'tab-download',
     'about': 'tab-about',
     'splunk': 'tab-splunk',
-    'config': 'tab-config'
+    'config': 'tab-config',
+    'iam': 'tab-iam'
 };
 
 function initNavigation() {
@@ -69,6 +80,10 @@ function switchTab(tabId, updateUrl = true) {
         section.classList.toggle('active', section.id === tabId);
     });
 
+    if (tabId === 'tab-iam') {
+        loadIamUsers();
+    }
+
     if (updateUrl && TAB_SLUG_MAP[tabId]) {
         const slug = '/' + TAB_SLUG_MAP[tabId];
         if (window.location.pathname !== slug) {
@@ -83,6 +98,274 @@ function handlePopState(e) {
         switchTab(SLUG_TAB_MAP[path], false);
     } else {
         switchTab('tab-dashboard', false);
+    }
+}
+
+async function checkAuthSession() {
+    try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (data.authenticated) {
+            currentUser = data;
+            hideAuthModal();
+            showUserBadge(data.username, data.role);
+            applyRbacUI(data.role);
+        } else {
+            showAuthModal('login');
+        }
+    } catch (e) {
+        showAuthModal('login');
+    }
+}
+
+function showAuthModal(screenName = 'login') {
+    const modal = document.getElementById('auth-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+
+    document.querySelectorAll('.auth-screen').forEach(s => s.classList.add('hidden'));
+
+    if (screenName === 'login') {
+        document.getElementById('auth-screen-login')?.classList.remove('hidden');
+    } else if (screenName === 'mfa') {
+        document.getElementById('auth-screen-mfa')?.classList.remove('hidden');
+    } else if (screenName === 'password') {
+        document.getElementById('auth-screen-password')?.classList.remove('hidden');
+    }
+}
+
+function hideAuthModal() {
+    const modal = document.getElementById('auth-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function showUserBadge(username, role) {
+    const container = document.getElementById('user-badge-container');
+    const nameTag = document.getElementById('user-display-name');
+    if (container && nameTag) {
+        container.style.display = 'flex';
+        nameTag.textContent = `${username} (${role.replace('_', ' ').toUpperCase()})`;
+    }
+}
+
+function applyRbacUI(role) {
+    const iamNavLink = document.getElementById('nav-link-iam');
+    if (iamNavLink) {
+        iamNavLink.style.display = (role === 'root_admin') ? 'inline-block' : 'none';
+    }
+
+    if (role === 'read_only_auditor') {
+        const runScanBtn = document.getElementById('btn-run-scan');
+        const resetInvBtn = document.getElementById('btn-reset-inventory');
+        const resetCfgBtn = document.getElementById('btn-reset-config');
+        if (runScanBtn) runScanBtn.disabled = true;
+        if (resetInvBtn) resetInvBtn.disabled = true;
+        if (resetCfgBtn) resetCfgBtn.disabled = true;
+    }
+}
+
+function initAuthFlow() {
+    // Step 1: Login Form
+    document.getElementById('form-auth-login')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('auth-login-username').value.trim();
+        const password = document.getElementById('auth-login-password').value;
+
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (data.success) {
+                pendingAuthUser = data;
+                
+                // Fetch MFA QR Code setup if not enabled
+                const mfaRes = await fetch('/api/auth/mfa-setup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ username })
+                });
+                const mfaData = await mfaRes.json();
+                if (mfaData.success) {
+                    pendingMfaSecret = mfaData.secret;
+                    const qrImg = document.getElementById('auth-qr-img');
+                    const secretKey = document.getElementById('auth-mfa-secret-key');
+                    const qrContainer = document.getElementById('auth-mfa-qr-container');
+
+                    if (qrImg) qrImg.src = mfaData.qr_code_uri;
+                    if (secretKey) secretKey.textContent = mfaData.secret;
+                    
+                    if (!data.mfa_enabled && qrContainer) {
+                        qrContainer.classList.remove('hidden');
+                    } else if (qrContainer) {
+                        qrContainer.classList.add('hidden');
+                    }
+                }
+                showAuthModal('mfa');
+            } else {
+                showToast("Login failed: " + data.message);
+            }
+        } catch (err) {
+            showToast("Connection error during login.");
+        }
+    });
+
+    // Step 2: MFA Verification Form
+    document.getElementById('form-auth-mfa')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const code = document.getElementById('auth-totp-code').value.trim();
+        if (!pendingAuthUser) return;
+
+        try {
+            const res = await fetch('/api/auth/mfa-verify', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: pendingAuthUser.username,
+                    code: code,
+                    secret: pendingMfaSecret
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                currentUser = data.user;
+                if (data.user.must_change_password) {
+                    showAuthModal('password');
+                } else {
+                    hideAuthModal();
+                    showToast("Authenticated successfully!");
+                    showUserBadge(data.user.username, data.user.role);
+                    applyRbacUI(data.user.role);
+                    loadStatus();
+                    loadAssets();
+                }
+            } else {
+                showToast("MFA error: " + data.message);
+            }
+        } catch (err) {
+            showToast("Error verifying TOTP MFA code.");
+        }
+    });
+
+    // Step 3: Mandatory Password Update Form
+    document.getElementById('form-auth-password')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newPass = document.getElementById('auth-new-password').value;
+        const confirmPass = document.getElementById('auth-confirm-password').value;
+
+        if (newPass !== confirmPass) {
+            showToast("Passwords do not match.");
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/auth/change-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: currentUser ? currentUser.username : (pendingAuthUser ? pendingAuthUser.username : ""),
+                    new_password: newPass
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                hideAuthModal();
+                showToast("Password updated successfully!");
+                checkAuthSession();
+            } else {
+                showToast("Password error: " + data.message);
+            }
+        } catch (err) {
+            showToast("Error updating password.");
+        }
+    });
+}
+
+async function handleLogout() {
+    try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        currentUser = null;
+        document.getElementById('user-badge-container').style.display = 'none';
+        showToast("Logged out.");
+        showAuthModal('login');
+    } catch (e) {
+        location.reload();
+    }
+}
+
+async function loadIamUsers() {
+    try {
+        const res = await fetch('/api/iam/users');
+        const data = await res.json();
+        const tbody = document.getElementById('iam-users-table-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!data.users || data.users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-muted">No users found.</td></tr>';
+            return;
+        }
+
+        data.users.forEach(u => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${u.username}</strong></td>
+                <td><span class="badge-role ${u.role}">${u.role.replace('_', ' ')}</span></td>
+                <td><span class="badge-status ${u.mfa_enabled ? 'green' : 'red'}">${u.mfa_enabled ? 'Enforced' : 'Pending'}</span></td>
+                <td><span class="badge-status ${u.must_change_password ? 'red' : 'green'}">${u.must_change_password ? 'Reset Required' : 'Compliant'}</span></td>
+                <td>${u.username !== 'admin' ? `<button class="btn-delete-asset" onclick="deleteIamUser('${u.username}')">Revoke</button>` : '<span class="text-muted">Protected</span>'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error("Failed to load IAM users:", e);
+    }
+}
+
+async function createIamUser(e) {
+    e.preventDefault();
+    const username = document.getElementById('iam-new-username').value.trim();
+    const role = document.getElementById('iam-new-role').value;
+
+    try {
+        const res = await fetch('/api/iam/users', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username, role })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            document.getElementById('iam-new-username').value = '';
+            loadIamUsers();
+        } else {
+            showToast("Failed: " + data.message);
+        }
+    } catch (e) {
+        showToast("Error creating IAM account.");
+    }
+}
+
+async function deleteIamUser(username) {
+    if (!confirm(`Revoke user account '${username}'?`)) return;
+
+    try {
+        const res = await fetch('/api/iam/users', {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            loadIamUsers();
+        } else {
+            showToast("Failed to revoke: " + data.message);
+        }
+    } catch (e) {
+        showToast("Error revoking user.");
     }
 }
 
@@ -374,8 +657,8 @@ async function loadStatus() {
             badgeShodan.className = `badge-status ${statusStr === 'Inactive' ? 'red' : 'green'}`;
         }
 
-        // Direct Dashboard Studio Link
-        const dashUrl = data.splunk_dashboard_url || "http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor";
+        // Direct Dashboard Studio SSO Link
+        const dashUrl = "/api/auth/splunk-sso";
         const link8000 = document.getElementById('link-splunk-8000');
         const dashLink8000 = document.getElementById('dash-btn-splunk-8000');
         if (link8000) link8000.href = dashUrl;
