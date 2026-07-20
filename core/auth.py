@@ -15,6 +15,7 @@ from core.logger import get_logger
 
 logger = get_logger()
 
+BASE_DIR = Path(__file__).resolve().parent.parent
 JWT_SECRET = os.getenv("JWT_SECRET", "easm_super_secure_jwt_secret_key_2026_mits")
 JWT_ALGORITHM = "HS256"
 
@@ -120,16 +121,21 @@ class AuthManager:
     def _ensure_users_file(self):
         """Bootstraps default Root Admin user if database doesn't exist."""
         vault_file = self.users_file.parent / "users.vault"
-        if not self.users_file.exists() and not vault_file.exists():
+        root_vault = BASE_DIR / "data" / "users.vault"
+        if not self.users_file.exists() and not vault_file.exists() and not root_vault.exists():
             self._bootstrap_admin()
-        elif self.users_file.exists() and not vault_file.exists():
-            # Sync existing users.json to users.vault
+        elif (self.users_file.exists() or root_vault.exists()) and not vault_file.exists():
             users = self._load_users()
             self._save_users(users)
 
     def _bootstrap_admin(self):
-        """Creates initial root_admin account: admin / Admin@2026Secure!"""
+        """Creates initial root_admin account: admin / Admin@2026Secure! (preserves existing MFA if configured)."""
+        existing = self._load_users()
+        if "admin" in existing:
+            return
+
         admin_pass_hash = self.hash_password("Admin@2026Secure!")
+        rec_keys = self.generate_recovery_keys(3)
         admin_user = {
             "username": "admin",
             "password_hash": admin_pass_hash,
@@ -137,33 +143,44 @@ class AuthManager:
             "must_change_password": True,
             "mfa_enabled": False,
             "mfa_secret": "",
+            "recovery_keys": rec_keys,
+            "recovery_key_hashes": [self.hash_password(k) for k in rec_keys],
             "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
-        users_data = {"admin": admin_user}
-        self._save_users(users_data)
+        existing["admin"] = admin_user
+        self._save_users(existing)
         logger.info("[+] Bootstrapped initial Root Admin account ('admin')")
 
     def _load_users(self) -> dict:
-        vault_file = self.users_file.parent / "users.vault"
         fernet = Fernet(_get_fernet_key())
 
-        # Check encrypted vault file first
-        if vault_file.exists():
-            try:
-                encrypted_data = vault_file.read_bytes()
-                decrypted_json = fernet.decrypt(encrypted_data).decode('utf-8')
-                return json.loads(decrypted_json)
-            except Exception as e:
-                logger.warning(f"[!] Failed to decrypt users.vault: {e}")
+        # Check primary vault file and repo data/users.vault file
+        vault_locations = [
+            self.users_file.parent / "users.vault",
+            BASE_DIR / "data" / "users.vault",
+            Path("/tmp/data/users.vault")
+        ]
+
+        for vf in vault_locations:
+            if vf.exists():
+                try:
+                    encrypted_data = vf.read_bytes()
+                    decrypted_json = fernet.decrypt(encrypted_data).decode('utf-8')
+                    loaded = json.loads(decrypted_json)
+                    if loaded:
+                        return loaded
+                except Exception as e:
+                    logger.warning(f"[!] Failed to decrypt {vf}: {e}")
 
         # Fallback to plain JSON file
-        if not self.users_file.exists():
-            self._bootstrap_admin()
-        try:
-            with self.users_file.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
+        if self.users_file.exists():
+            try:
+                with self.users_file.open("r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+
+        return {}
 
     def _save_users(self, data: dict):
         # Save to plain JSON file
@@ -173,11 +190,24 @@ class AuthManager:
         except Exception as e:
             logger.error(f"[!] Failed to save users JSON: {e}")
 
-        # Save AES-256 encrypted vault file
+        # Save AES-256 encrypted vault file to primary and repo data/ directories
         try:
-            vault_file = self.users_file.parent / "users.vault"
             fernet = Fernet(_get_fernet_key())
             json_bytes = json.dumps(data).encode('utf-8')
+            encrypted = fernet.encrypt(json_bytes)
+
+            vault_locations = [
+                self.users_file.parent / "users.vault",
+                BASE_DIR / "data" / "users.vault"
+            ]
+            for vf in vault_locations:
+                try:
+                    vf.parent.mkdir(parents=True, exist_ok=True)
+                    vf.write_bytes(encrypted)
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.error(f"[!] Failed to save encrypted users.vault: {e}")
             encrypted_bytes = fernet.encrypt(json_bytes)
             vault_file.write_bytes(encrypted_bytes)
         except Exception as e:
@@ -305,12 +335,12 @@ class AuthManager:
             return Path("/tmp/audit_log.json")
 
     def log_audit(self, username: str, role: str, action: str, details: str, category: str = "IAM", severity: str = "INFO"):
-        """Logs structured security audit event to audit_log.json."""
+        """Logs structured security audit event to audit_log.json with strict 60-day retention policy."""
         log_file = self._get_audit_log_file()
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now_dt = datetime.datetime.now(datetime.timezone.utc)
         entry = {
             "id": secrets.token_hex(6),
-            "timestamp": now,
+            "timestamp": now_dt.isoformat(),
             "username": username,
             "role": role,
             "action": action,
@@ -325,9 +355,20 @@ class AuthManager:
             except Exception:
                 logs = []
         logs.insert(0, entry)
-        logs = logs[:1000]
+
+        # Enforce 60-Day Retention Policy: Preserve all log entries <= 60 days old
+        cutoff_dt = now_dt - datetime.timedelta(days=60)
+        filtered_logs = []
+        for l in logs:
+            try:
+                ts = datetime.datetime.fromisoformat(l.get("timestamp"))
+                if ts >= cutoff_dt:
+                    filtered_logs.append(l)
+            except Exception:
+                filtered_logs.append(l)
+
         try:
-            log_file.write_text(json.dumps(logs, indent=2), encoding="utf-8")
+            log_file.write_text(json.dumps(filtered_logs, indent=2), encoding="utf-8")
         except Exception as e:
             logger.error(f"[!] Failed to write audit log: {e}")
 

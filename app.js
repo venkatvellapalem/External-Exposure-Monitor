@@ -673,6 +673,39 @@ async function openMfaEnableModal(username) {
     }
 }
 
+function toggleUserActionDropdown(e, username) {
+    e.stopPropagation();
+    document.querySelectorAll('.user-actions-dropdown').forEach(d => {
+        if (d.id !== `dropdown-user-actions-${username}`) {
+            d.classList.add('hidden');
+        }
+    });
+    const dropdown = document.getElementById(`dropdown-user-actions-${username}`);
+    if (dropdown) dropdown.classList.toggle('hidden');
+}
+
+async function probeResetUserMfa(username) {
+    if (!confirm(`Reset TOTP MFA secret for '${username}'? User will be required to re-scan a new QR code immediately.`)) return;
+
+    try {
+        const res = await fetch('/api/iam/reset-mfa', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            loadIamUsers();
+            openMfaEnableModal(username);
+        } else {
+            showToast("Failed to reset MFA: " + data.message);
+        }
+    } catch (e) {
+        showToast("Error resetting MFA secret.");
+    }
+}
+
 async function loadIamUsers() {
     try {
         const res = await fetch('/api/iam/users');
@@ -710,11 +743,27 @@ async function loadIamUsers() {
                 <td>
                     ${!u.mfa_enabled ? `
                         <button class="btn-delete-asset" onclick="openMfaEnableModal('${u.username}')" style="background:#0284c7; color:#ffffff;">Enable MFA</button>
-                    ` : ''}
-                    ${u.username !== 'admin' ? `
-                        <button class="btn-delete-asset danger" onclick="deleteIamUser('${u.username}')" style="margin-left:6px;">Revoke</button>
-                        <button class="btn-delete-asset" onclick="resetUserMfa('${u.username}')" style="margin-left:6px; background:var(--bg-tertiary, #3f3f46); color:#38bdf8;">Reset MFA</button>
-                    ` : (u.mfa_enabled ? '<span class="text-muted">Protected</span>' : '')}
+                    ` : `
+                        <div style="position:relative; display:inline-block;">
+                            <button class="btn-icon-dots" onclick="toggleUserActionDropdown(event, '${u.username}')" title="Actions">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;">
+                                    <circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                                </svg>
+                            </button>
+                            <div id="dropdown-user-actions-${u.username}" class="user-actions-dropdown hidden">
+                                <button onclick="probeResetUserMfa('${u.username}')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; margin-right:6px;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                    Reset MFA Secret
+                                </button>
+                                ${u.username !== 'admin' ? `
+                                    <button class="danger-item" onclick="deleteIamUser('${u.username}')">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; margin-right:6px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        Revoke User
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `}
                 </td>
             `;
             tbody.appendChild(tr);
