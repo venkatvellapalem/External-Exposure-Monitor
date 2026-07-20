@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initLiveIngestionCanvas();
     initAuthFlow();
     initPasswordToggles();
+    initHamburgerDrawer();
+    initProfileDropdown();
 
     checkAuthSession();
     loadStatus();
@@ -75,6 +77,9 @@ function initNavigation() {
 
 function switchTab(tabId, updateUrl = true) {
     document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.toggle('active', link.getAttribute('data-tab') === tabId);
+    });
+    document.querySelectorAll('.drawer-item').forEach(link => {
         link.classList.toggle('active', link.getAttribute('data-tab') === tabId);
     });
     document.querySelectorAll('.tab-content').forEach(section => {
@@ -145,17 +150,26 @@ function hideAuthModal() {
 function showUserBadge(username, role) {
     const container = document.getElementById('user-badge-container');
     const nameTag = document.getElementById('user-display-name');
+    const dropdownUser = document.getElementById('dropdown-user-name');
+    const dropdownRole = document.getElementById('dropdown-user-role');
+
+    const formattedRole = role.replace('_', ' ').toUpperCase();
+
     if (container && nameTag) {
-        container.style.display = 'flex';
-        nameTag.textContent = `${username} (${role.replace('_', ' ').toUpperCase()})`;
+        container.style.display = 'inline-block';
+        nameTag.textContent = `${username} (${formattedRole})`;
     }
+    if (dropdownUser) dropdownUser.textContent = username;
+    if (dropdownRole) dropdownRole.textContent = formattedRole;
 }
 
 function applyRbacUI(role) {
-    const iamNavLink = document.getElementById('nav-link-iam');
-    if (iamNavLink) {
-        iamNavLink.style.display = (role === 'root_admin') ? 'inline-block' : 'none';
-    }
+    const iamDropdownItem = document.getElementById('dropdown-item-iam');
+    const drawerIamItem = document.getElementById('drawer-link-iam');
+
+    const isRootAdmin = (role === 'root_admin');
+    if (iamDropdownItem) iamDropdownItem.style.display = isRootAdmin ? 'flex' : 'none';
+    if (drawerIamItem) drawerIamItem.style.display = isRootAdmin ? 'flex' : 'none';
 
     if (role === 'read_only_auditor') {
         const runScanBtn = document.getElementById('btn-run-scan');
@@ -165,6 +179,64 @@ function applyRbacUI(role) {
         if (resetInvBtn) resetInvBtn.disabled = true;
         if (resetCfgBtn) resetCfgBtn.disabled = true;
     }
+}
+
+function initHamburgerDrawer() {
+    const btnHamburger = document.getElementById('btn-hamburger');
+    const drawerOverlay = document.getElementById('sidebar-drawer-overlay');
+    const btnClose = document.getElementById('btn-close-drawer');
+
+    if (!btnHamburger || !drawerOverlay) return;
+
+    btnHamburger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        drawerOverlay.classList.remove('hidden');
+    });
+
+    if (btnClose) {
+        btnClose.addEventListener('click', () => {
+            drawerOverlay.classList.add('hidden');
+        });
+    }
+
+    drawerOverlay.addEventListener('click', (e) => {
+        if (e.target === drawerOverlay) {
+            drawerOverlay.classList.add('hidden');
+        }
+    });
+
+    document.querySelectorAll('.drawer-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const targetTab = item.getAttribute('data-tab');
+            if (targetTab) {
+                switchTab(targetTab, true);
+                drawerOverlay.classList.add('hidden');
+            }
+        });
+    });
+}
+
+function initProfileDropdown() {
+    const btnProfile = document.getElementById('btn-profile-dropdown');
+    const menu = document.getElementById('profile-dropdown-menu');
+
+    if (!btnProfile || !menu) return;
+
+    btnProfile.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!menu.contains(e.target) && !btnProfile.contains(e.target)) {
+            menu.classList.add('hidden');
+        }
+    });
+}
+
+function closeProfileDropdown() {
+    const menu = document.getElementById('profile-dropdown-menu');
+    if (menu) menu.classList.add('hidden');
 }
 
 function initPasswordToggles() {
@@ -339,6 +411,7 @@ async function handleLogout() {
         await fetch('/api/auth/logout', { method: 'POST' });
         currentUser = null;
         document.getElementById('user-badge-container').style.display = 'none';
+        closeProfileDropdown();
         showToast("Logged out.");
         showAuthModal('login');
     } catch (e) {

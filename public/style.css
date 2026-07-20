@@ -1078,3 +1078,246 @@ body {
 .auth-error-banner.hidden {
     display: none !important;
 }
+
+/* Nav Left & Hamburger Button */
+.nav-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.hamburger-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-input);
+    padding: 6px 8px;
+    cursor: pointer;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.hamburger-btn:hover {
+    background: var(--bg-alt);
+}
+
+.hamburger-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* User Profile Pill & Dropdown Menu */
+.profile-dropdown-container {
+    position: relative;
+    display: inline-block;
+}
+
+.profile-pill-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-pill);
+    padding: 6px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    transition: all 0.15s ease;
+}
+
+.profile-pill-btn:hover {
+    background: var(--bg-alt);
+}
+
+.chevron-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+}
+
+.profile-dropdown-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: 220px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-md);
+    padding: 8px 0;
+    z-index: 10000;
+    animation: fadeIn 0.15s ease;
+}
+
+.profile-dropdown-menu.hidden {
+    display: none !important;
+}
+
+.dropdown-header {
+    padding: 8px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dropdown-username {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-main);
+}
+
+.dropdown-role-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-alt);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    width: fit-content;
+}
+
+.dropdown-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 6px 0;
+}
+
+.dropdown-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-main);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease;
+}
+
+.dropdown-item:hover {
+    background: var(--bg-alt);
+}
+
+.dropdown-item svg {
+    width: 16px;
+    height: 16px;
+    color: var(--text-muted);
+}
+
+.dropdown-item.danger {
+    color: #dc2626;
+}
+
+.dropdown-item.danger svg {
+    color: #dc2626;
+}
+
+/* Sidebar Drawer Overlay Navigation */
+.drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 99999;
+    display: flex;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+.drawer-overlay.hidden {
+    display: none !important;
+}
+
+.drawer-panel {
+    width: 300px;
+    max-width: 85vw;
+    height: 100%;
+    background: var(--bg-card);
+    border-right: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    animation: slideRight 0.25s ease-out;
+}
+
+@keyframes slideRight {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+}
+
+.drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.drawer-brand {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.drawer-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 2px 8px;
+}
+
+.drawer-close-btn:hover {
+    color: var(--text-main);
+}
+
+.drawer-nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.drawer-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-main);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-input);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease;
+}
+
+.drawer-item:hover, .drawer-item.active {
+    background: var(--bg-alt);
+    font-weight: 600;
+}
+
+.drawer-item svg {
+    width: 18px;
+    height: 18px;
+    color: var(--text-muted);
+}

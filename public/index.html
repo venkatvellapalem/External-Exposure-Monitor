@@ -11,34 +11,67 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Ollama-style Header Navigation -->
+    <!-- Header Navigation -->
     <header class="navbar">
         <div class="nav-container">
-            <div class="nav-brand">
-                <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="9"/>
-                    <circle cx="12" cy="12" r="5" stroke-dasharray="2 2"/>
-                    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                    <path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
-                    <path d="m12 12 4-4"/>
-                </svg>
-                <span class="brand-title">EASM Engine</span>
-                <span class="brand-badge">v2.4</span>
+            <!-- Left: Hamburger Button & Brand -->
+            <div class="nav-left">
+                <button id="btn-hamburger" class="hamburger-btn" title="Open Navigation Menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <div class="nav-brand" onclick="switchTab('tab-dashboard')">
+                    <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9"/>
+                        <circle cx="12" cy="12" r="5" stroke-dasharray="2 2"/>
+                        <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                        <path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
+                        <path d="m12 12 4-4"/>
+                    </svg>
+                    <span class="brand-title">EASM Engine</span>
+                    <span class="brand-badge">v2.4</span>
+                </div>
             </div>
+
+            <!-- Center: Essential Links Only -->
             <nav class="nav-menu">
                 <button class="nav-link active" data-tab="tab-dashboard">Dashboard</button>
-                <button class="nav-link" data-tab="tab-scanner">Scan Controller</button>
                 <button class="nav-link" data-tab="tab-assets">Asset Inventory</button>
-                <button class="nav-link" data-tab="tab-download">Download</button>
-                <button class="nav-link" data-tab="tab-about">Architecture</button>
                 <button class="nav-link" data-tab="tab-splunk">Splunk SOC Hub</button>
-                <button class="nav-link" data-tab="tab-config">Settings</button>
-                <button class="nav-link" data-tab="tab-iam" id="nav-link-iam">IAM Users</button>
             </nav>
+
+            <!-- Right: Embedded Profile Dropdown & GitHub Link -->
             <div class="nav-actions">
-                <div id="user-badge-container" class="user-badge-container" style="display:none;">
-                    <span id="user-display-name" class="user-name-tag">admin</span>
-                    <button class="pill-btn secondary small" id="btn-user-logout">Logout</button>
+                <div id="user-badge-container" class="profile-dropdown-container" style="display:none;">
+                    <button id="btn-profile-dropdown" class="profile-pill-btn">
+                        <span id="user-display-name" class="user-name-tag">admin (ROOT ADMIN)</span>
+                        <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    <div id="profile-dropdown-menu" class="profile-dropdown-menu hidden">
+                        <div class="dropdown-header">
+                            <div id="dropdown-user-name" class="dropdown-username">admin</div>
+                            <div id="dropdown-user-role" class="dropdown-role-badge">ROOT ADMIN</div>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" id="dropdown-item-iam" onclick="switchTab('tab-iam'); closeProfileDropdown();">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            IAM Users
+                        </button>
+                        <button class="dropdown-item" onclick="switchTab('tab-config'); closeProfileDropdown();">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                            Settings
+                        </button>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item danger" id="btn-user-logout">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                            Logout
+                        </button>
+                    </div>
                 </div>
                 <a href="https://github.com/venkatvellapalem/External-Exposure-Monitor" target="_blank" class="nav-btn-icon" title="View Source on GitHub">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -48,6 +81,52 @@
             </div>
         </div>
     </header>
+
+    <!-- Sidebar Drawer Navigation Overlay -->
+    <div id="sidebar-drawer-overlay" class="drawer-overlay hidden">
+        <div class="drawer-panel">
+            <div class="drawer-header">
+                <div class="drawer-brand">
+                    <span class="brand-title">Navigation Menu</span>
+                </div>
+                <button id="btn-close-drawer" class="drawer-close-btn">&times;</button>
+            </div>
+            <div class="drawer-nav-list">
+                <button class="drawer-item" data-tab="tab-dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    Dashboard
+                </button>
+                <button class="drawer-item" data-tab="tab-assets">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                    Asset Inventory
+                </button>
+                <button class="drawer-item" data-tab="tab-splunk">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                    Splunk SOC Hub
+                </button>
+                <button class="drawer-item" data-tab="tab-scanner">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    Scan Controller
+                </button>
+                <button class="drawer-item" data-tab="tab-download">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download & Installation
+                </button>
+                <button class="drawer-item" data-tab="tab-about">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    Architecture & About
+                </button>
+                <button class="drawer-item" data-tab="tab-config">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Settings
+                </button>
+                <button class="drawer-item" data-tab="tab-iam" id="drawer-link-iam">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    IAM Users
+                </button>
+            </div>
+        </div>
+    </div>
 
     <main class="main-layout">
         <!-- Toast Notification Container -->
