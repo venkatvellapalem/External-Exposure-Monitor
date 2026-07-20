@@ -361,6 +361,42 @@ function clearAuthErrors() {
 }
 
 function initAuthFlow() {
+    document.getElementById('btn-cancel-enable-mfa')?.addEventListener('click', () => {
+        document.getElementById('enable-mfa-modal')?.classList.add('hidden');
+    });
+
+    document.getElementById('form-enable-mfa')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const code = document.getElementById('mfa-enable-code').value.trim();
+        const errBanner = document.getElementById('mfa-enable-error');
+        if (!pendingEnableMfaUser || !pendingEnableMfaSecret) return;
+
+        try {
+            const res = await fetch('/api/auth/mfa-verify', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: pendingEnableMfaUser,
+                    code: code,
+                    secret: pendingEnableMfaSecret
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('enable-mfa-modal')?.classList.add('hidden');
+                showToast(`TOTP MFA successfully enabled and enforced for '${pendingEnableMfaUser}'!`);
+                loadIamUsers();
+            } else {
+                if (errBanner) {
+                    errBanner.textContent = "MFA Verification Failed: " + data.message;
+                    errBanner.classList.remove('hidden');
+                }
+            }
+        } catch (err) {
+            showToast("Error verifying TOTP code.");
+        }
+    });
+
     document.getElementById('btn-show-recovery')?.addEventListener('click', () => {
         showAuthModal('recovery');
     });
@@ -549,15 +585,21 @@ async function loadAdminRecoveryKey() {
             container.innerHTML = '';
             data.recovery_keys.forEach((key, idx) => {
                 const box = document.createElement('div');
-                box.className = 'code-box';
+                box.className = 'breakglass-key-card';
                 box.innerHTML = `
-                    <span>Key #${idx + 1}: <code>${key}</code></span>
-                    <button class="copy-btn" onclick="copySingleKey('${key}')" title="Copy Key #${idx + 1}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                        </svg>
-                    </button>
+                    <div class="key-card-header">
+                        <span class="key-card-title">Key #${idx + 1}</span>
+                        <span class="key-card-status">ACTIVE ●</span>
+                    </div>
+                    <div class="key-card-body">
+                        <code>${key}</code>
+                        <button class="copy-btn" onclick="copySingleKey('${key}')" title="Copy Key #${idx + 1}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                        </button>
+                    </div>
                 `;
                 container.appendChild(box);
             });
@@ -569,6 +611,37 @@ function copySingleKey(key) {
     navigator.clipboard.writeText(key).then(() => {
         showToast(`Master Recovery Key '${key}' copied to clipboard!`);
     });
+}
+
+let pendingEnableMfaUser = null;
+let pendingEnableMfaSecret = null;
+
+async function openMfaEnableModal(username) {
+    pendingEnableMfaUser = username;
+    const modal = document.getElementById('enable-mfa-modal');
+    if (!modal) return;
+
+    try {
+        const res = await fetch('/api/auth/mfa-setup', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username })
+        });
+        const data = await res.json();
+        if (data.success) {
+            pendingEnableMfaSecret = data.secret;
+            document.getElementById('mfa-enable-qr-img').src = data.qr_code_uri;
+            document.getElementById('mfa-enable-secret-key').textContent = data.secret;
+            document.getElementById('mfa-enable-code').value = '';
+            document.getElementById('mfa-enable-error').classList.add('hidden');
+            document.getElementById('mfa-enable-desc').textContent = `Scan the QR code below with Google Authenticator or Authy to activate MFA for user account '${username}'.`;
+            modal.classList.remove('hidden');
+        } else {
+            showToast("Failed to setup MFA: " + data.message);
+        }
+    } catch (e) {
+        showToast("Error setting up MFA secret.");
+    }
 }
 
 async function loadIamUsers() {
@@ -606,10 +679,13 @@ async function loadIamUsers() {
                 <td><span class="badge-status ${u.mfa_enabled ? 'green' : 'red'}">${u.mfa_enabled ? 'Enforced' : 'Pending'}</span></td>
                 <td><span class="badge-status ${u.must_change_password ? 'red' : 'green'}">${u.must_change_password ? 'Reset Required' : 'Compliant'}</span></td>
                 <td>
+                    ${!u.mfa_enabled ? `
+                        <button class="btn-delete-asset" onclick="openMfaEnableModal('${u.username}')" style="background:#0284c7; color:#ffffff;">Enable MFA</button>
+                    ` : ''}
                     ${u.username !== 'admin' ? `
-                        <button class="btn-delete-asset danger" onclick="deleteIamUser('${u.username}')">Revoke</button>
+                        <button class="btn-delete-asset danger" onclick="deleteIamUser('${u.username}')" style="margin-left:6px;">Revoke</button>
                         <button class="btn-delete-asset" onclick="resetUserMfa('${u.username}')" style="margin-left:6px; background:var(--bg-tertiary, #3f3f46); color:#38bdf8;">Reset MFA</button>
-                    ` : '<span class="text-muted">Protected</span>'}
+                    ` : (u.mfa_enabled ? '<span class="text-muted">Protected</span>' : '')}
                 </td>
             `;
             tbody.appendChild(tr);

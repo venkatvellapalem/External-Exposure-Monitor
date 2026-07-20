@@ -1427,3 +1427,75 @@ body {
     background: #fee2e2;
     color: #b91c1c;
 }
+
+/* Break-Glass Emergency Recovery Kit Styling */
+.breakglass-card {
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    background: linear-gradient(180deg, rgba(239, 68, 68, 0.03) 0%, var(--bg-card) 100%);
+}
+
+.breakglass-keys-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.breakglass-key-card {
+    background: var(--bg-main, #18181b);
+    border: 1px solid var(--border-color, #27272a);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.breakglass-key-card:hover {
+    border-color: #38bdf8;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);
+}
+
+.key-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.key-card-title {
+    color: var(--text-muted, #71717a);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.key-card-status {
+    color: #10b981;
+    font-size: 11px;
+}
+
+.key-card-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.key-card-body code {
+    font-family: 'Fira Code', 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main, #f4f4f5);
+    letter-spacing: 0.5px;
+}
+
+.breakglass-action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color, #27272a);
+}

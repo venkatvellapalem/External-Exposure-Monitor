@@ -8,7 +8,7 @@ import ssl
 import yaml
 import base64
 from pathlib import Path
-from flask import Flask, request, jsonify, send_file, redirect, make_response
+from flask import Flask, request, jsonify, send_file, redirect, make_response, Response
 from dotenv import load_dotenv
 from functools import wraps
 from core.auth import AuthManager
@@ -171,12 +171,58 @@ def serve_js():
 @app.route('/context/easm_dashboard_studio.json')
 @app.route('/easm_dashboard_studio.json')
 def serve_dashboard_json():
+    current_user = get_current_user_from_request()
+    uname = current_user.get("username") if current_user else "anonymous"
+    urole = current_user.get("role") if current_user else "user"
+    auth_manager.log_audit(uname, urole, "FILE_DOWNLOADED", "Downloaded Splunk Dashboard Studio JSON configuration", category="FILES", severity="INFO")
+
     json_file = BASE_DIR / "easm_dashboard_studio.json"
     if not json_file.exists():
         json_file = BASE_DIR / "public" / "easm_dashboard_studio.json"
     if json_file.exists():
-        return send_file(str(json_file), mimetype='application/json')
+        return send_file(str(json_file), mimetype='application/json', as_attachment=True, download_name="easm_dashboard_studio.json")
     return "", 404
+
+@app.route('/api/download/zip', methods=['GET'])
+@app.route('/download/archive.zip', methods=['GET'])
+def download_archive_zip():
+    current_user = get_current_user_from_request()
+    uname = current_user.get("username") if current_user else "anonymous"
+    urole = current_user.get("role") if current_user else "user"
+    auth_manager.log_audit(uname, urole, "FILE_DOWNLOADED", "Downloaded source code ZIP archive (External-Exposure-Monitor.zip)", category="FILES", severity="INFO")
+
+    zip_file = BASE_DIR / "External-Exposure-Monitor-main.zip"
+    if zip_file.exists():
+        return send_file(str(zip_file), as_attachment=True, download_name="External-Exposure-Monitor-main.zip")
+    return redirect("https://github.com/venkatvellapalem/External-Exposure-Monitor/archive/refs/heads/main.zip")
+
+@app.route('/api/download/breakglass-keys', methods=['GET'])
+def download_breakglass_keys():
+    current_user = get_current_user_from_request()
+    if not current_user or current_user.get("role") != "root_admin":
+        return jsonify({"success": False, "message": "Access denied. Root Admin role required."}), 403
+
+    admin_user = auth_manager.get_user(current_user.get("username"))
+    rec_keys = admin_user.get("recovery_keys", [])
+
+    auth_manager.log_audit(current_user.get("username"), "root_admin", "FILE_DOWNLOADED", "Downloaded Master Emergency Break-Glass Recovery Kit (.txt)", category="FILES", severity="WARNING")
+
+    text_content = "=== EASM MASTER EMERGENCY BREAK-GLASS RECOVERY KIT ===\n"
+    text_content += f"Generated At: {import_datetime_now()}\n"
+    text_content += f"User: {current_user.get('username')}\n\n"
+    for idx, key in enumerate(rec_keys):
+        text_content += f"Key #{idx+1}: {key}\n"
+    text_content += "\nSTORE THESE KEYS OFFLINE IN A SECURE PASSWORD VAULT. EACH KEY BURNS AUTOMATICALLY AFTER SINGLE USE.\n"
+
+    return Response(
+        text_content,
+        mimetype="text/plain",
+        headers={"Content-Disposition": "attachment;filename=easm_breakglass_keys.txt"}
+    )
+
+def import_datetime_now():
+    import datetime
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 @app.route('/api/status', methods=['GET'])
 def get_status():
