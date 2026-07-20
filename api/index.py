@@ -470,6 +470,22 @@ def test_hec():
 
     return jsonify({"success": False, "message": f"Connection failed: {last_error}", "updated_url": target_url})
 
+def save_assets_to_yaml(data):
+    """Saves asset data structure directly to config/assets.yaml across environment targets."""
+    try:
+        writable_assets = get_writable_file("config/assets.yaml")
+        with writable_assets.open("w", encoding="utf-8") as f:
+            yaml.dump(data, f, default_flow_style=False)
+    except Exception:
+        pass
+    try:
+        local_assets = BASE_DIR / "config" / "assets.yaml"
+        if local_assets.exists():
+            with local_assets.open("w", encoding="utf-8") as f:
+                yaml.dump(data, f, default_flow_style=False)
+    except Exception:
+        pass
+
 @app.route('/api/assets', methods=['GET', 'POST', 'DELETE'])
 def handle_assets():
     assets_path = get_assets_path()
@@ -514,20 +530,27 @@ def handle_assets():
         if "assets" not in data or data["assets"] is None:
             data["assets"] = []
 
-        new_asset = {"type": t_type, "value": val}
-        if domain:
-            new_asset["domain"] = domain
+        existing_assets = data["assets"]
+        found = False
+        for a in existing_assets:
+            if a.get("value") == val:
+                a["type"] = t_type
+                if domain:
+                    a["domain"] = domain
+                found = True
+                break
 
-        data["assets"].append(new_asset)
-        writable_assets = get_writable_file("config/assets.yaml")
-        try:
-            with writable_assets.open("w", encoding="utf-8") as f:
-                yaml.dump(data, f, default_flow_style=False)
-        except (OSError, PermissionError):
-            pass
+        if not found:
+            new_asset = {"type": t_type, "value": val}
+            if domain:
+                new_asset["domain"] = domain
+            existing_assets.append(new_asset)
+
+        data["assets"] = existing_assets
+        save_assets_to_yaml(data)
 
         deleted_set.discard(val)
-        resp = make_response(jsonify({"success": True, "message": f"Added {t_type}: {val}"}))
+        resp = make_response(jsonify({"success": True, "message": f"Added target {t_type}: {val}"}))
         resp.set_cookie("easm_deleted_assets", ",".join(deleted_set), max_age=365 * 24 * 3600, samesite="Lax")
         return resp
 
@@ -538,19 +561,17 @@ def handle_assets():
         if not val_to_delete:
             return jsonify({"success": False, "message": "Target value required for deletion."})
 
+        data = {"organization": "MITS", "assets": []}
         if assets_path.exists():
             try:
                 with assets_path.open("r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f) or {}
-                
-                assets = data.get("assets", [])
-                data["assets"] = [a for a in assets if a.get("value") != val_to_delete]
-                
-                writable_assets = get_writable_file("config/assets.yaml")
-                with writable_assets.open("w", encoding="utf-8") as f:
-                    yaml.dump(data, f, default_flow_style=False)
+                    data = yaml.safe_load(f) or data
             except Exception:
                 pass
+
+        raw_assets = data.get("assets", []) or []
+        data["assets"] = [a for a in raw_assets if a.get("value") != val_to_delete]
+        save_assets_to_yaml(data)
 
         deleted_set.add(val_to_delete)
         resp = make_response(jsonify({"success": True, "message": f"Removed asset target: {val_to_delete}"}))
@@ -565,12 +586,8 @@ def reset_assets():
     if confirm_text != "delete my asset inventory":
         return jsonify({"success": False, "message": "Confirmation string mismatch. Reset aborted."})
 
-    writable_assets = get_writable_file("config/assets.yaml")
-    try:
-        with writable_assets.open("w", encoding="utf-8") as f:
-            yaml.dump({"organization": "MITS", "assets": []}, f, default_flow_style=False)
-    except Exception:
-        pass
+    empty_data = {"organization": "MITS", "assets": []}
+    save_assets_to_yaml(empty_data)
 
     writable_baseline = get_writable_file("data/baseline.json")
     try:
@@ -579,7 +596,9 @@ def reset_assets():
     except Exception:
         pass
 
-    return jsonify({"success": True, "message": "Asset inventory and baseline metrics successfully reset!"})
+    resp = make_response(jsonify({"success": True, "message": "Asset inventory and baseline metrics successfully reset!"}))
+    resp.set_cookie("easm_deleted_assets", "", expires=0)
+    return resp
 
 @app.route('/api/scan', methods=['POST'])
 def trigger_scan():
