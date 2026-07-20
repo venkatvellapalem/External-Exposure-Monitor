@@ -312,6 +312,7 @@ def handle_config():
 
         try:
             with env_path.open("w", encoding="utf-8") as f:
+                f.write(f"ORGANIZATION={new_org}\n")
                 f.write(f"SPLUNK_URL={new_url}\n")
                 f.write(f"SPLUNK_HEC_TOKEN={new_token}\n")
                 f.write(f"SCAN_TIMEOUT={new_timeout}\n")
