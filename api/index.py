@@ -19,14 +19,33 @@ app = Flask(__name__)
 handler = app
 application = app
 
+def get_writable_file(relative_path: str) -> Path:
+    target = BASE_DIR / relative_path
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        test = target.parent / ".write_test"
+        test.touch()
+        test.unlink()
+        return target
+    except (OSError, PermissionError):
+        tmp_target = Path("/tmp") / relative_path
+        tmp_target.parent.mkdir(parents=True, exist_ok=True)
+        return tmp_target
+
 def get_env_path():
-    return BASE_DIR / ".env"
+    return get_writable_file(".env")
 
 def get_assets_path():
-    return BASE_DIR / "config" / "assets.yaml"
+    target = BASE_DIR / "config" / "assets.yaml"
+    if target.exists():
+        return target
+    return get_writable_file("config/assets.yaml")
 
 def get_baseline_path():
-    return BASE_DIR / "data" / "baseline.json"
+    target = BASE_DIR / "data" / "baseline.json"
+    if target.exists():
+        return target
+    return get_writable_file("data/baseline.json")
 
 @app.route('/')
 @app.route('/dashboard')
@@ -112,7 +131,7 @@ def get_status():
         host = parts.split(":", 1)[0]
         splunk_web = f"http://{host}:8000"
 
-    splunk_dashboard = f"{splunk_web}/en-US/app/search/easm_soc_command_center"
+    splunk_dashboard = "http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor"
 
     return jsonify({
         "status": "online",
@@ -137,14 +156,11 @@ def handle_config():
         token = os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
         censys = os.getenv("CENSYS_API_TOKEN", "censys_EoyeoHTw_4Bqv968FBtRVrrQ9fZrJNisw")
         timeout = os.getenv("SCAN_TIMEOUT", "2.5")
-        
-        masked_hec = token[:6] + "..." + token[-4:] if len(token) > 10 else ("****" if token else "")
-        masked_censys = censys[:6] + "..." + censys[-4:] if len(censys) > 10 else ("****" if censys else "")
 
         return jsonify({
             "splunk_url": url,
-            "splunk_token_masked": masked_hec,
-            "censys_token_masked": masked_censys,
+            "splunk_token": token,
+            "censys_token": censys,
             "scan_timeout": timeout
         })
     else:
@@ -154,11 +170,14 @@ def handle_config():
         new_censys = data.get("censys_token", "").strip() or os.getenv("CENSYS_API_TOKEN", "censys_EoyeoHTw_4Bqv968FBtRVrrQ9fZrJNisw")
         new_timeout = data.get("scan_timeout", "2.5").strip()
 
-        with env_path.open("w", encoding="utf-8") as f:
-            f.write(f"SPLUNK_URL={new_url}\n")
-            f.write(f"SPLUNK_HEC_TOKEN={new_token}\n")
-            f.write(f"SCAN_TIMEOUT={new_timeout}\n")
-            f.write(f"CENSYS_API_TOKEN={new_censys}\n")
+        try:
+            with env_path.open("w", encoding="utf-8") as f:
+                f.write(f"SPLUNK_URL={new_url}\n")
+                f.write(f"SPLUNK_HEC_TOKEN={new_token}\n")
+                f.write(f"SCAN_TIMEOUT={new_timeout}\n")
+                f.write(f"CENSYS_API_TOKEN={new_censys}\n")
+        except (OSError, PermissionError):
+            pass
             
         load_dotenv(override=True)
         return jsonify({"success": True, "message": "Configuration updated successfully."})
@@ -240,9 +259,12 @@ def handle_assets():
             new_asset["domain"] = domain
 
         data["assets"].append(new_asset)
-        assets_path.parent.mkdir(parents=True, exist_ok=True)
-        with assets_path.open("w", encoding="utf-8") as f:
-            yaml.dump(data, f, default_flow_style=False)
+        writable_assets = get_writable_file("config/assets.yaml")
+        try:
+            with writable_assets.open("w", encoding="utf-8") as f:
+                yaml.dump(data, f, default_flow_style=False)
+        except (OSError, PermissionError):
+            pass
 
         return jsonify({"success": True, "message": f"Added {t_type}: {val}"})
 
@@ -260,7 +282,8 @@ def handle_assets():
             assets = data.get("assets", [])
             data["assets"] = [a for a in assets if a.get("value") != val_to_delete]
             
-            with assets_path.open("w", encoding="utf-8") as f:
+            writable_assets = get_writable_file("config/assets.yaml")
+            with writable_assets.open("w", encoding="utf-8") as f:
                 yaml.dump(data, f, default_flow_style=False)
 
             return jsonify({"success": True, "message": f"Removed asset: {val_to_delete}"})

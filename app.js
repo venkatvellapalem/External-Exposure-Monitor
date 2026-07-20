@@ -105,13 +105,12 @@ async function loadStatus() {
         if (document.getElementById('dash-sys-status')) document.getElementById('dash-sys-status').textContent = data.status ? data.status.toUpperCase() : 'ONLINE';
         if (document.getElementById('dash-org-name')) document.getElementById('dash-org-name').textContent = `Organization: ${data.organization || 'MITS'}`;
 
-        // Splunk Web Port 8000 Links
-        if (data.splunk_web_url) {
-            const link8000 = document.getElementById('link-splunk-8000');
-            const dashLink8000 = document.getElementById('dash-btn-splunk-8000');
-            if (link8000) link8000.href = data.splunk_web_url;
-            if (dashLink8000) dashLink8000.href = data.splunk_web_url;
-        }
+        // Direct Dashboard Studio Link
+        const dashUrl = data.splunk_dashboard_url || "http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor";
+        const link8000 = document.getElementById('link-splunk-8000');
+        const dashLink8000 = document.getElementById('dash-btn-splunk-8000');
+        if (link8000) link8000.href = dashUrl;
+        if (dashLink8000) dashLink8000.href = dashUrl;
     } catch (e) {
         console.error("Failed to load status:", e);
     }
@@ -122,6 +121,8 @@ async function loadConfig() {
         const res = await fetch('/api/config');
         const data = await res.json();
         if (data.splunk_url) document.getElementById('cfg-splunk-url').value = data.splunk_url;
+        if (data.splunk_token) document.getElementById('cfg-splunk-token').value = data.splunk_token;
+        if (data.censys_token) document.getElementById('cfg-censys-token').value = data.censys_token;
         if (data.scan_timeout) document.getElementById('cfg-scan-timeout').value = data.scan_timeout;
     } catch (e) {
         console.error("Failed to load config:", e);
@@ -148,7 +149,7 @@ async function saveConfig(e) {
         });
         const data = await res.json();
         if (data.success) {
-            showToast("System settings saved to .env");
+            showToast("System settings saved successfully!");
             loadStatus();
         } else {
             showToast("Failed to save config: " + data.message);

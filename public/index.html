@@ -113,7 +113,7 @@
                 <h3 class="info-card-title">Deep Investigation in Splunk SOC Center</h3>
                 <p class="info-card-desc">Open your Splunk Enterprise Web UI on Port 8000 to launch the interactive Dashboard Studio.</p>
                 <div class="action-footer justify-center">
-                    <a href="http://13.205.90.142:8000" id="dash-btn-splunk-8000" target="_blank" class="pill-btn primary">Open Splunk Web UI</a>
+                    <a href="http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor" id="dash-btn-splunk-8000" target="_blank" class="pill-btn primary">Open Dashboard Studio App</a>
                     <button class="pill-btn secondary" onclick="switchTab('tab-scanner')">Run EASM Scan Now</button>
                 </div>
             </div>
@@ -245,18 +245,18 @@ Waiting for scan trigger...</pre>
                     <div class="form-group">
                         <label>Target Type</label>
                         <select id="asset-type" class="form-input">
-                            <option value="ip">Single IP (e.g. 117.250.201.144)</option>
+                            <option value="ip">Single IP (e.g. 203.0.113.195)</option>
                             <option value="cidr">CIDR Range (e.g. 192.168.1.0/24)</option>
-                            <option value="domain">Domain Name (e.g. google.com)</option>
+                            <option value="domain">Domain Name (e.g. example.com)</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label>Target Value</label>
-                        <input type="text" id="asset-value" class="form-input" placeholder="117.250.201.144" required>
+                        <input type="text" id="asset-value" class="form-input" placeholder="203.0.113.195" required>
                     </div>
                     <div class="form-group">
                         <label>Associated Domain (Optional)</label>
-                        <input type="text" id="asset-domain" class="form-input" placeholder="Results MITSUCET">
+                        <input type="text" id="asset-domain" class="form-input" placeholder="example.com">
                     </div>
                     <div class="form-group form-submit">
                         <button type="submit" class="pill-btn primary">Add Asset Target</button>
@@ -298,17 +298,17 @@ Waiting for scan trigger...</pre>
                     <div class="form-row">
                         <div class="form-group full">
                             <label>Splunk HEC URL (Port 8088 Endpoint)</label>
-                            <input type="url" id="cfg-splunk-url" class="form-input" value="https://13.205.90.142:8088/services/collector/event" required>
+                            <input type="url" id="cfg-splunk-url" class="form-input" placeholder="https://13.205.90.142:8088/services/collector/event" required>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group half">
                             <label>Splunk HEC Token</label>
-                            <input type="password" id="cfg-splunk-token" class="form-input" value="4263ed61-500e-47a0-a45e-6b32a05857f3">
+                            <input type="text" id="cfg-splunk-token" class="form-input" placeholder="your_splunk_hec_token">
                         </div>
                         <div class="form-group half">
                             <label>Censys Personal Access Token (PAT)</label>
-                            <input type="password" id="cfg-censys-token" class="form-input" value="censys_EoyeoHTw_4Bqv968FBtRVrrQ9fZrJNisw">
+                            <input type="text" id="cfg-censys-token" class="form-input" placeholder="censys_your_pat_token">
                         </div>
                     </div>
                     <div class="form-row">
@@ -335,10 +335,10 @@ Waiting for scan trigger...</pre>
 
             <div class="grid-2">
                 <div class="card">
-                    <h3 class="info-card-title">Splunk Web UI (Port 8000)</h3>
-                    <p class="info-card-desc">Access the main Splunk Enterprise interface on port 8000 to view ingested events and manage search jobs.</p>
+                    <h3 class="info-card-title">Dashboard Studio App (Port 8000)</h3>
+                    <p class="info-card-desc">Access your custom Splunk Dashboard Studio instance directly on port 8000.</p>
                     <div class="action-footer">
-                        <a href="http://13.205.90.142:8000" id="link-splunk-8000" target="_blank" class="pill-btn primary">Open Splunk Web UI</a>
+                        <a href="http://13.205.90.142:8000/en-GB/app/search/external_attack_surface_monitor" id="link-splunk-8000" target="_blank" class="pill-btn primary">Open Dashboard Studio App</a>
                     </div>
                 </div>
 
@@ -346,7 +346,7 @@ Waiting for scan trigger...</pre>
                     <h3 class="info-card-title">Dashboard Studio Code</h3>
                     <p class="info-card-desc">Download or copy the latest Dashboard Studio JSON code with drilldowns and series color mappings.</p>
                     <div class="action-footer">
-                        <a href="/context/easm_dashboard_studio.json" target="_blank" class="pill-btn secondary">View Dashboard Studio</a>
+                        <a href="/context/easm_dashboard_studio.json" target="_blank" class="pill-btn secondary">View Dashboard JSON</a>
                     </div>
                 </div>
             </div>
