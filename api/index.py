@@ -86,7 +86,7 @@ def query_splunk_rest_api(host: str, username: str = "admin", password: str = "S
         "Content-Type": "application/x-www-form-urlencoded"
     }
     data = urllib.parse.urlencode({
-        "search": "search index=* source=easm_collector | dedup ip, port | head 20",
+        "search": "search (index=monitored_data OR index=main OR index=*) source=easm_collector | dedup ip, port | head 20",
         "output_mode": "json"
     }).encode('utf-8')
 
