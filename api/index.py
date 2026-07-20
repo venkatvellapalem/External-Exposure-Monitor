@@ -30,6 +30,16 @@ def get_baseline_path():
 def serve_index():
     return send_from_directory(app.static_folder, 'index.html')
 
+@app.route('/dashboard')
+@app.route('/download')
+@app.route('/about')
+@app.route('/scanner')
+@app.route('/assets')
+@app.route('/splunk')
+@app.route('/config')
+def serve_routes():
+    return send_from_directory(app.static_folder, 'index.html')
+
 @app.route('/<path:path>')
 def serve_static(path):
     if (Path(app.static_folder) / path).exists():
@@ -41,40 +51,75 @@ def get_status():
     baseline_path = get_baseline_path()
     total_open = 0
     critical_count = 0
+    low_count = 0
+    medium_count = 0
+    exposures_list = []
+
     if baseline_path.exists():
         try:
             with baseline_path.open('r', encoding='utf-8') as f:
                 data = json.load(f)
-                total_open = sum(1 for v in data.values() if v == "open")
+                for key, val in data.items():
+                    if val == "open":
+                        total_open += 1
+                        ip, port = key.split(":")
+                        port_num = int(port)
+                        risk = "Critical" if port_num in {3389, 23} else ("High" if port_num in {445, 21, 22} else "Low")
+                        if risk == "Critical": critical_count += 1
+                        elif risk == "Low": low_count += 1
+                        else: medium_count += 1
+
+                        exposures_list.append({"ip": ip, "port": port_num, "risk": risk, "status": "open"})
         except Exception:
             pass
 
     assets_path = get_assets_path()
     asset_count = 0
+    org_name = "MITS"
     if assets_path.exists():
         try:
             with assets_path.open('r', encoding='utf-8') as f:
                 a_data = yaml.safe_load(f)
-                if a_data and "assets" in a_data:
-                    asset_count = len(a_data["assets"])
+                if a_data:
+                    org_name = a_data.get("organization", "MITS")
+                    if "assets" in a_data and a_data["assets"]:
+                        asset_count = len(a_data["assets"])
         except Exception:
             pass
 
+    raw_hec = os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
+    
+    # Calculate Splunk Web UI on port 8000
+    splunk_web = "http://13.205.90.142:8000"
+    if raw_hec.startswith("http://") or raw_hec.startswith("https://"):
+        parts = raw_hec.split("//", 1)[1].split("/", 1)[0]
+        host = parts.split(":", 1)[0]
+        splunk_web = f"http://{host}:8000"
+
+    splunk_dashboard = f"{splunk_web}/en-US/app/search/easm_soc_command_center"
+
     return jsonify({
         "status": "online",
+        "organization": org_name,
         "total_open": total_open,
+        "critical_count": critical_count,
+        "low_count": low_count,
+        "medium_count": medium_count,
         "monitored_targets": asset_count,
-        "splunk_url": os.getenv("SPLUNK_URL", ""),
-        "has_censys": bool(os.getenv("CENSYS_API_TOKEN"))
+        "splunk_hec_url": raw_hec,
+        "splunk_web_url": splunk_web,
+        "splunk_dashboard_url": splunk_dashboard,
+        "has_censys": bool(os.getenv("CENSYS_API_TOKEN")),
+        "exposures": exposures_list
     })
 
 @app.route('/api/config', methods=['GET', 'POST'])
 def handle_config():
     env_path = get_env_path()
     if request.method == 'GET':
-        url = os.getenv("SPLUNK_URL", "")
-        token = os.getenv("SPLUNK_HEC_TOKEN", "")
-        censys = os.getenv("CENSYS_API_TOKEN", "")
+        url = os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
+        token = os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
+        censys = os.getenv("CENSYS_API_TOKEN", "censys_EoyeoHTw_4Bqv968FBtRVrrQ9fZrJNisw")
         timeout = os.getenv("SCAN_TIMEOUT", "2.5")
         
         masked_hec = token[:6] + "..." + token[-4:] if len(token) > 10 else ("****" if token else "")
@@ -88,16 +133,10 @@ def handle_config():
         })
     else:
         data = request.json or {}
-        new_url = data.get("splunk_url", "").strip()
-        new_token = data.get("splunk_token", "").strip()
-        new_censys = data.get("censys_token", "").strip()
+        new_url = data.get("splunk_url", "").strip() or "https://13.205.90.142:8088/services/collector/event"
+        new_token = data.get("splunk_token", "").strip() or os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
+        new_censys = data.get("censys_token", "").strip() or os.getenv("CENSYS_API_TOKEN", "censys_EoyeoHTw_4Bqv968FBtRVrrQ9fZrJNisw")
         new_timeout = data.get("scan_timeout", "2.5").strip()
-
-        # Load existing if omitted
-        if not new_token:
-            new_token = os.getenv("SPLUNK_HEC_TOKEN", "")
-        if not new_censys and "censys_token" not in data:
-            new_censys = os.getenv("CENSYS_API_TOKEN", "")
 
         with env_path.open("w", encoding="utf-8") as f:
             f.write(f"SPLUNK_URL={new_url}\n")
@@ -111,8 +150,8 @@ def handle_config():
 @app.route('/api/test-hec', methods=['POST'])
 def test_hec():
     data = request.json or {}
-    url = data.get("splunk_url") or os.getenv("SPLUNK_URL", "")
-    token = data.get("splunk_token") or os.getenv("SPLUNK_HEC_TOKEN", "")
+    url = data.get("splunk_url") or os.getenv("SPLUNK_URL", "https://13.205.90.142:8088/services/collector/event")
+    token = data.get("splunk_token") or os.getenv("SPLUNK_HEC_TOKEN", "4263ed61-500e-47a0-a45e-6b32a05857f3")
 
     if not url or not token:
         return jsonify({"success": False, "message": "Splunk URL and HEC Token are required."})
@@ -149,16 +188,16 @@ def handle_assets():
     
     if request.method == 'GET':
         if not assets_path.exists():
-            return jsonify({"organization": "Default", "assets": []})
+            return jsonify({"organization": "MITS", "assets": []})
         try:
             with assets_path.open("r", encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
                 return jsonify({
-                    "organization": data.get("organization", "Default"),
+                    "organization": data.get("organization", "MITS"),
                     "assets": data.get("assets", [])
                 })
         except Exception as e:
-            return jsonify({"organization": "Default", "assets": [], "error": str(e)})
+            return jsonify({"organization": "MITS", "assets": [], "error": str(e)})
 
     elif request.method == 'POST':
         body = request.json or {}
@@ -169,7 +208,7 @@ def handle_assets():
         if not val:
             return jsonify({"success": False, "message": "Asset value is required."})
 
-        data = {"organization": "Enterprise Network", "assets": []}
+        data = {"organization": "MITS", "assets": []}
         if assets_path.exists():
             try:
                 with assets_path.open("r", encoding="utf-8") as f:

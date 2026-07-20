@@ -1,4 +1,5 @@
-organization: Sample Enterprise
 assets:
-  - type: domain
-    value: testaspnet.vulnweb.com
+- domain: Results MITSUCET
+  type: ip
+  value: 117.250.201.144
+organization: MITS

@@ -23,6 +23,21 @@ function initNavigation() {
             switchTab(targetTab);
         });
     });
+
+    // Check pathname for direct links
+    const path = window.location.pathname.replace('/', '');
+    const tabMap = {
+        'dashboard': 'tab-dashboard',
+        'scanner': 'tab-scanner',
+        'assets': 'tab-assets',
+        'download': 'tab-download',
+        'about': 'tab-about',
+        'splunk': 'tab-splunk',
+        'config': 'tab-config'
+    };
+    if (tabMap[path]) {
+        switchTab(tabMap[path]);
+    }
 }
 
 function switchTab(tabId) {
@@ -81,11 +96,21 @@ async function loadStatus() {
     try {
         const res = await fetch('/api/status');
         const data = await res.json();
-        document.getElementById('stat-total-open').textContent = data.total_open || 0;
-        document.getElementById('stat-monitored-targets').textContent = data.monitored_targets || 0;
-        document.getElementById('stat-engine-status').textContent = `Collector Status: ${data.status.toUpperCase()}`;
-        if (data.splunk_url) {
-            document.getElementById('link-open-splunk').href = data.splunk_url.split('/services/collector')[0];
+
+        // Dashboard Metrics
+        if (document.getElementById('dash-total-open')) document.getElementById('dash-total-open').textContent = data.total_open || 0;
+        if (document.getElementById('dash-monitored-targets')) document.getElementById('dash-monitored-targets').textContent = data.monitored_targets || 0;
+        if (document.getElementById('dash-crit-count')) document.getElementById('dash-crit-count').textContent = data.critical_count || 0;
+        if (document.getElementById('dash-low-count')) document.getElementById('dash-low-count').textContent = data.low_count || 0;
+        if (document.getElementById('dash-sys-status')) document.getElementById('dash-sys-status').textContent = data.status ? data.status.toUpperCase() : 'ONLINE';
+        if (document.getElementById('dash-org-name')) document.getElementById('dash-org-name').textContent = `Organization: ${data.organization || 'MITS'}`;
+
+        // Splunk Web Port 8000 Links
+        if (data.splunk_web_url) {
+            const link8000 = document.getElementById('link-splunk-8000');
+            const dashLink8000 = document.getElementById('dash-btn-splunk-8000');
+            if (link8000) link8000.href = data.splunk_web_url;
+            if (dashLink8000) dashLink8000.href = data.splunk_web_url;
         }
     } catch (e) {
         console.error("Failed to load status:", e);
