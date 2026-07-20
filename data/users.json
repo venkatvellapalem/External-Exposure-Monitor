@@ -6,15 +6,17 @@
         "must_change_password": true,
         "mfa_enabled": true,
         "mfa_secret": "KASNJVKWJPWRFWZ2BORRFQWUXIU5FIYG",
-        "created_at": "2026-07-20T12:16:30.847365+00:00"
+        "created_at": "2026-07-20T12:16:30.847365+00:00",
+        "recovery_key": "EASM-RECOVER-44F8-245E-D952-6C43",
+        "recovery_key_hash": "$2b$12$L7M/Fs7ic9iA8SJpr7LUDOdPIutjGPt2MLjLAyRwWHgzaBiUVZ6hS"
     },
     "analyst1": {
         "username": "analyst1",
-        "password_hash": "$2b$12$dCTWPd68hKdnD5REvzFMY.sLSR/8.BeEVH5BrGXSZ/1PCrhbpmKsm",
+        "password_hash": "$2b$12$VJbDF5VJnadkondk6tMQmu9QtAAYo6fkugg7skENpsLEv8.uprSzC",
         "role": "soc_analyst",
-        "must_change_password": false,
+        "must_change_password": true,
         "mfa_enabled": false,
         "mfa_secret": "",
-        "created_at": "2026-07-20T15:29:11.249301+00:00"
+        "created_at": "2026-07-20T16:01:25.435647+00:00"
     }
 }

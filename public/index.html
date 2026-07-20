@@ -509,7 +509,7 @@ Waiting for scan trigger...</pre>
 
                     <div class="form-row">
                         <div class="form-group half">
-                            <label>New User Initial Password (16+ Chars)</label>
+                            <label>New User Initial Password</label>
                             <div class="password-input-wrapper">
                                 <input type="password" id="iam-new-password" class="form-input" placeholder="" required autocomplete="new-password">
                                 <button type="button" class="btn-toggle-pass" data-target="iam-new-password" title="Toggle Password Visibility">
@@ -531,6 +531,16 @@ Waiting for scan trigger...</pre>
                                     </svg>
                                 </button>
                             </div>
+                            <span id="iam-pass-match-error" class="input-error-text red hidden">Passwords do not match</span>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group full">
+                            <label class="checkbox-label" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:500;">
+                                <input type="checkbox" id="iam-force-reset" checked style="width:18px; height:18px; cursor:pointer;">
+                                <span>Require user to change password on first login (Enforces 16+ char complexity policy)</span>
+                            </label>
                         </div>
                     </div>
 
@@ -550,9 +560,24 @@ Waiting for scan trigger...</pre>
                     </div>
 
                     <div class="form-actions">
-                        <button type="submit" class="pill-btn primary">Create IAM Account</button>
+                        <button type="submit" class="pill-btn primary" id="btn-submit-create-iam">Create IAM Account</button>
                     </div>
                 </form>
+            </div>
+
+            <!-- Master Emergency Break-Glass Recovery Kit Card -->
+            <div class="card">
+                <h3 class="card-subtitle">Master Emergency Break-Glass Recovery Kit</h3>
+                <p class="info-card-desc">Keep this 256-bit emergency recovery key stored safely in an offline password manager or vault. If admin credentials are lost or locked out, this key can recover full Root Admin access without email or OTP dependencies.</p>
+                <div class="code-box margin-bottom" style="margin-top:12px;">
+                    <code id="iam-display-recovery-key">EASM-RECOVER-LOADING...</code>
+                    <button class="copy-btn" id="btn-copy-recovery-key" title="Copy Master Recovery Key">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <div class="card">
@@ -640,6 +665,9 @@ Waiting for scan trigger...</pre>
                         <div class="modal-actions">
                             <button type="submit" class="pill-btn primary full-width">Sign In</button>
                         </div>
+                        <div class="text-center" style="margin-top: 14px;">
+                            <button type="button" id="btn-show-recovery" class="btn-link-recovery" style="background:none; border:none; color:var(--text-muted, #71717a); font-size:13px; cursor:pointer; text-decoration:underline;">Emergency Admin Recovery (Break-Glass Key)</button>
+                        </div>
                     </form>
                 </div>
 
@@ -700,6 +728,53 @@ Waiting for scan trigger...</pre>
                         </div>
                         <div class="modal-actions">
                             <button type="submit" class="pill-btn danger full-width">Update Password & Continue</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- SCREEN 4: Master Emergency Break-Glass Admin Recovery Screen -->
+                <div id="auth-screen-recovery" class="auth-screen hidden">
+                    <h3 class="modal-title danger-text">Emergency Admin Account Recovery</h3>
+                    <p class="modal-desc">Enter your Username and 256-bit Master Emergency Recovery Key to reset your Root Admin password offline.</p>
+                    
+                    <div id="auth-recovery-error" class="auth-error-banner hidden"></div>
+
+                    <form id="form-auth-recovery">
+                        <div class="form-group margin-bottom">
+                            <label>Admin Username</label>
+                            <input type="text" id="rec-admin-username" class="form-input" value="admin" required autocomplete="username">
+                        </div>
+                        <div class="form-group margin-bottom">
+                            <label>Master Emergency Recovery Key (EASM-RECOVER-XXXX...)</label>
+                            <input type="text" id="rec-master-key" class="form-input" placeholder="EASM-RECOVER-XXXX-YYYY-ZZZZ-WWWW" required autocomplete="off">
+                        </div>
+                        <div class="form-group margin-bottom">
+                            <label>New Strong Password (16+ Chars)</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="rec-new-password" class="form-input" placeholder="" required autocomplete="new-password">
+                                <button type="button" class="btn-toggle-pass" data-target="rec-new-password" title="Toggle Password Visibility">
+                                    <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group margin-bottom">
+                            <label>Confirm New Password</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="rec-confirm-password" class="form-input" placeholder="" required autocomplete="new-password">
+                                <button type="button" class="btn-toggle-pass" data-target="rec-confirm-password" title="Toggle Password Visibility">
+                                    <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" class="pill-btn secondary" id="btn-cancel-recovery">Back to Sign In</button>
+                            <button type="submit" class="pill-btn danger">Reset Admin Password & Recover</button>
                         </div>
                     </form>
                 </div>

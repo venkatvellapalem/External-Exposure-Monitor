@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initHamburgerDrawer();
     initProfileDropdown();
     initInactivityTracker();
+    initIamPasswordMatchListener();
 
     checkAuthSession();
     loadStatus();
@@ -121,6 +122,7 @@ function switchTab(tabId, updateUrl = true) {
 
     if (tabId === 'tab-iam') {
         loadIamUsers();
+        loadAdminRecoveryKey();
     }
 
     if (updateUrl && TAB_SLUG_MAP[tabId]) {
@@ -173,6 +175,8 @@ function showAuthModal(screenName = 'login') {
         document.getElementById('auth-screen-mfa')?.classList.remove('hidden');
     } else if (screenName === 'password') {
         document.getElementById('auth-screen-password')?.classList.remove('hidden');
+    } else if (screenName === 'recovery') {
+        document.getElementById('auth-screen-recovery')?.classList.remove('hidden');
     }
 }
 
@@ -303,6 +307,33 @@ function initPasswordToggles() {
     });
 }
 
+function initIamPasswordMatchListener() {
+    const newPass = document.getElementById('iam-new-password');
+    const confirmPass = document.getElementById('iam-confirm-password');
+    const errSpan = document.getElementById('iam-pass-match-error');
+    const submitBtn = document.getElementById('btn-submit-create-iam');
+
+    if (!newPass || !confirmPass || !errSpan) return;
+
+    const validateMatch = () => {
+        const p1 = newPass.value;
+        const p2 = confirmPass.value;
+
+        if (p2.length > 0 && p1 !== p2) {
+            errSpan.classList.remove('hidden');
+            confirmPass.style.borderColor = 'var(--accent-red, #ef4444)';
+            if (submitBtn) submitBtn.disabled = true;
+        } else {
+            errSpan.classList.add('hidden');
+            confirmPass.style.borderColor = '';
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    };
+
+    newPass.addEventListener('input', validateMatch);
+    confirmPass.addEventListener('input', validateMatch);
+}
+
 function showAuthError(bannerId, message) {
     const banner = document.getElementById(bannerId);
     if (banner) {
@@ -320,6 +351,15 @@ function clearAuthErrors() {
 }
 
 function initAuthFlow() {
+    // Show Recovery Screen Trigger
+    document.getElementById('btn-show-recovery')?.addEventListener('click', () => {
+        showAuthModal('recovery');
+    });
+
+    document.getElementById('btn-cancel-recovery')?.addEventListener('click', () => {
+        showAuthModal('login');
+    });
+
     // Step 1: Login Form
     document.getElementById('form-auth-login')?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -337,7 +377,6 @@ function initAuthFlow() {
             if (data.success) {
                 pendingAuthUser = data;
                 
-                // Fetch MFA QR Code setup if not enabled
                 const mfaRes = await fetch('/api/auth/mfa-setup', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -442,6 +481,45 @@ function initAuthFlow() {
             showAuthError('auth-pass-error', "Error updating password.");
         }
     });
+
+    // Step 4: Master Emergency Break-Glass Recovery Form
+    document.getElementById('form-auth-recovery')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearAuthErrors();
+        const username = document.getElementById('rec-admin-username').value.trim();
+        const recoveryKey = document.getElementById('rec-master-key').value.trim();
+        const newPass = document.getElementById('rec-new-password').value;
+        const confirmPass = document.getElementById('rec-confirm-password').value;
+
+        if (newPass !== confirmPass) {
+            showAuthError('auth-recovery-error', "Passwords do not match.");
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/auth/admin-recovery', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: username,
+                    recovery_key: recoveryKey,
+                    new_password: newPass
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message);
+                showAuthModal('login');
+                document.getElementById('rec-master-key').value = '';
+                document.getElementById('rec-new-password').value = '';
+                document.getElementById('rec-confirm-password').value = '';
+            } else {
+                showAuthError('auth-recovery-error', "Recovery error: " + data.message);
+            }
+        } catch (err) {
+            showAuthError('auth-recovery-error', "Error executing Master Emergency Recovery.");
+        }
+    });
 }
 
 async function handleLogout(reasonMsg) {
@@ -454,6 +532,17 @@ async function handleLogout(reasonMsg) {
     closeProfileDropdown();
     showToast(reasonMsg ? reasonMsg : "Logged out.");
     showAuthModal('login');
+}
+
+async function loadAdminRecoveryKey() {
+    try {
+        const res = await fetch('/api/iam/recovery-key');
+        const data = await res.json();
+        const codeEl = document.getElementById('iam-display-recovery-key');
+        if (codeEl && data.success) {
+            codeEl.textContent = data.recovery_key;
+        }
+    } catch (e) {}
 }
 
 async function loadIamUsers() {
@@ -492,6 +581,7 @@ async function createIamUser(e) {
     const password = document.getElementById('iam-new-password').value;
     const confirmPassword = document.getElementById('iam-confirm-password').value;
     const adminPassword = document.getElementById('iam-admin-password').value;
+    const forceReset = document.getElementById('iam-force-reset')?.checked ?? true;
 
     if (password !== confirmPassword) {
         showToast("New user initial passwords do not match.");
@@ -507,7 +597,8 @@ async function createIamUser(e) {
                 role: role,
                 password: password,
                 confirm_password: confirmPassword,
-                admin_password: adminPassword
+                admin_password: adminPassword,
+                must_change_password: forceReset
             })
         });
         const data = await res.json();
@@ -785,6 +876,13 @@ function initCopyButtons() {
         const text = document.getElementById('install-command').textContent;
         navigator.clipboard.writeText(text).then(() => {
             showToast("Installation command copied to clipboard!");
+        });
+    });
+
+    document.getElementById('btn-copy-recovery-key')?.addEventListener('click', () => {
+        const text = document.getElementById('iam-display-recovery-key').textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showToast("Master Emergency Recovery Key copied to clipboard!");
         });
     });
 }

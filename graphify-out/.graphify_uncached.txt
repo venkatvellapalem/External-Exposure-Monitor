@@ -1,0 +1,8 @@
+C:\Users\keert\Desktop\Projects\EASM\README.md
+C:\Users\keert\Desktop\Projects\EASM\config\assets.yaml
+C:\Users\keert\Desktop\Projects\EASM\context\project_context.md
+C:\Users\keert\Desktop\Projects\EASM\index.html
+C:\Users\keert\Desktop\Projects\EASM\public\index.html
+C:\Users\keert\Desktop\Projects\EASM\requirements.txt
+C:\Users\keert\Desktop\Projects\EASM\favicon.svg
+C:\Users\keert\Desktop\Projects\EASM\public\favicon.svg

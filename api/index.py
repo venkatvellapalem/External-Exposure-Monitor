@@ -716,6 +716,7 @@ def handle_iam_users():
         password = data.get("password", "")
         confirm_password = data.get("confirm_password", "")
         admin_password = data.get("admin_password", "")
+        must_change_password = bool(data.get("must_change_password", True))
 
         if not username:
             return jsonify({"success": False, "message": "Username is required."}), 400
@@ -730,11 +731,10 @@ def handle_iam_users():
             return jsonify({"success": False, "message": "Admin authorization password is required to create a user."}), 400
 
         admin_username = current_user.get("username")
-        admin_user = auth_manager.get_user(admin_username)
-        if not admin_user or not auth_manager.verify_password(admin_password, admin_user.get("password_hash", "")):
+        if not auth_manager.verify_admin_authorization(admin_username, admin_password):
             return jsonify({"success": False, "message": "Invalid admin authorization password. User creation denied."}), 401
 
-        success, msg = auth_manager.create_user(username, role, password)
+        success, msg = auth_manager.create_user(username, role, password, must_change_password=must_change_password)
         if not success:
             return jsonify({"success": False, "message": msg}), 400
 
@@ -755,6 +755,38 @@ def handle_iam_users():
             return jsonify({"success": False, "message": msg}), 400
 
         return jsonify({"success": True, "message": msg})
+
+@app.route('/api/auth/admin-recovery', methods=['POST'])
+def auth_admin_recovery():
+    """Emergency break-glass recovery route for Root Admin password reset."""
+    data = request.json or {}
+    username = data.get("username", "admin").strip().lower()
+    recovery_key = data.get("recovery_key", "").strip()
+    new_password = data.get("new_password", "")
+
+    if not username or not recovery_key or not new_password:
+        return jsonify({"success": False, "message": "Username, Master Emergency Recovery Key, and New Password are required."}), 400
+
+    success, msg, new_key = auth_manager.recover_admin_account(username, recovery_key, new_password)
+    if not success:
+        return jsonify({"success": False, "message": msg}), 400
+
+    return jsonify({
+        "success": True,
+        "message": msg,
+        "new_recovery_key": new_key
+    })
+
+@app.route('/api/iam/recovery-key', methods=['GET'])
+def get_admin_recovery_key():
+    """Root Admin route to view or retrieve Master Emergency Recovery Key."""
+    current_user = get_current_user_from_request()
+    if not current_user or current_user.get("role") != "root_admin":
+        return jsonify({"success": False, "message": "Access denied. Root Admin role required."}), 403
+
+    admin_user = auth_manager.get_user(current_user.get("username"))
+    rec_key = admin_user.get("recovery_key", "EASM-RECOVER-DEFAULT-KEY")
+    return jsonify({"success": True, "recovery_key": rec_key})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
